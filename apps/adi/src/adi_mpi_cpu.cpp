@@ -452,6 +452,7 @@ int main(int argc, char* argv[]) {
     //exit(-2);
 
     timing_start(app.prof, &timer2);
+    // TODO why is length app.n_sys_l * 3 * 2 when above it was app.n_sys_g?
     MPI_Alltoall(mpi.halo_sndbuf, app.n_sys_l*3*2, MPI_FLOAT, mpi.halo_rcvbuf,
       app.n_sys_l*3*2, MPI_FLOAT, mpi.x_comm/*MPI_COMM_WORLD*/); //************************* Is the rcreation of mpi.x_comm above and its use correct ??
     timing_end(app.prof, &timer2, &app.elapsed_time[2], app.elapsed_name[2]);

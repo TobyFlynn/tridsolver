@@ -4,6 +4,9 @@ option(INTEL_CC "Use the Intel compiler." ON)
 option(BUILD_FOR_CPU "Build library for CPU architecture." OFF) 
 option(BUILD_FOR_MIC "Build library for MIC architecture." OFF) 
 option(BUILD_FOR_GPU "Build library for GPU architecture." OFF) 
+set(LIBTRID_PATH $ENV{TRIDSOLVER_INSTALL_PATH}
+  CACHE STRING "Tridsolver (scalar) installation directory")
+
 
 if (INTEL_CC) 
   # Detect/find Intel compilers
@@ -29,8 +32,8 @@ project("adi")
 
 if (INTEL_CC) 
   # Set compiler flags/options for Intel compiler
-  set(FLAGS_INTEL_DEFAULT "-xCORE_AVX2 -parallel -openmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par -opt-report-phase=offload")
-  #set(FLAGS_INTEL_DEFAULT "-xAVX -m64 -parallel -openmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par") #-xCORE_AVX2 
+  set(FLAGS_INTEL_DEFAULT "-xHost -parallel -qopenmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par -qopt-report-phase=offload")
+  #set(FLAGS_INTEL_DEFAULT "-xAVX -m64 -parallel -qopenmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par") #-xCORE_AVX2 
   set(FLAGS_INTEL_DEBUG   "-g -O0")
   set(FLAGS_INTEL_RELEASE "-g -std=c99 -O0 -ip -restrict") #-fp-model fast 
 
@@ -58,8 +61,6 @@ endif (INTEL_CC)
 
 
 #set(CMAKE_GENERATOR_TOOLSET "Intel C++ Compiler XE 15.0" CACHE STRING "Platform Toolset" FORCE)
-
-set(LIBTRID_PATH "/home/mgiles/mudalige/TriDiagonal/Tridiag-Git/tridsolver/scalar/build")
 
 set(N_MAX 1024 CACHE STRING "Maximum length of the internal buffer for storing intermediate c and d vectors of the Thomas algorithm") 
 add_definitions(-DN_MAX=${N_MAX}) 

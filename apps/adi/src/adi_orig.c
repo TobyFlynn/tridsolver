@@ -60,6 +60,7 @@ inline double elapsed_time(double *et) {
 
   return *et - old_time;
 }
+double elapsed_time(double*);
 
 extern char *optarg;
 extern int  optind, opterr, optopt; 
