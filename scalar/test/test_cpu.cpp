@@ -3,6 +3,9 @@
 
 #include <trid_cpu.h>
 #include <trid_simd.h>
+#include <trid_mpi_cpu.hpp>
+
+#include <memory>
 
 template <typename Float, unsigned Align>
 void require_allclose(const AlignedArray<Float, Align> &expected,
@@ -295,4 +298,32 @@ TEST_CASE("cpu: trid_scalar_vec large") {
       }
     }
   }
+}
+
+TEST_CASE("cpu: thomas on reduced") {
+  std::unique_ptr<MeshLoader<double, 1>> _mesh;
+  SECTION("small") {
+    _mesh.reset(new MeshLoader<double, 1>("files/one_dim_small"));
+  }
+  SECTION("large") {
+    _mesh.reset(new MeshLoader<double, 1>("files/one_dim_large"));
+  }
+  MeshLoader<double, 1> &mesh = *_mesh;
+  AlignedArray<double, 1> aa(mesh.a()), cc(mesh.c()), dd(mesh.d());
+
+  const int stride = 1;
+  const size_t N = mesh.dims()[mesh.solve_dim()];
+  cc[0] /= mesh.b()[0];
+  dd[0] /= mesh.b()[0];
+  for (size_t i = 1; i < N - 1; ++i) {
+    aa[i] /= mesh.b()[i];
+    cc[i] /= mesh.b()[i];
+    dd[i] /= mesh.b()[i];
+  }
+  aa[N - 1] /= mesh.b()[N - 1];
+  dd[N - 1] /= mesh.b()[N - 1];
+
+  thomas_on_reduced<double>(aa.data(), cc.data(), dd.data(), N, stride);
+
+  require_allclose(mesh.u(), dd, N, stride);
 }
