@@ -180,6 +180,8 @@ inline void thomas_forward(
     }
   }
   else {
+    printf("One of the processes has fewer than 2 equations, this is not "
+           "supported\n");
     exit(-1);
   }
 }
