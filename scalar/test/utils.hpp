@@ -22,6 +22,7 @@ public:
   AlignedArray();
   ~AlignedArray();
   AlignedArray(const AlignedArray &other);
+  AlignedArray(const AlignedArray &other, size_t start, size_t end);
   AlignedArray(AlignedArray &&);
   AlignedArray &operator=(AlignedArray);
 
@@ -91,6 +92,15 @@ AlignedArray<T, Align>::AlignedArray(const AlignedArray &other)
   allocate(other._capacity);
   std::copy(other.data(), other.data() + other._size, this->data());
   _size = other._size;
+}
+
+template <typename T, unsigned Align>
+AlignedArray<T, Align>::AlignedArray(const AlignedArray &other, size_t start,
+                                     size_t end)
+    : padded_data{nullptr}, _size{0}, _capacity{0} {
+  allocate(end - start);
+  std::copy(other.data() + start, other.data() + end, this->data());
+  _size = end-start;
 }
 
 template <typename T, unsigned Align>

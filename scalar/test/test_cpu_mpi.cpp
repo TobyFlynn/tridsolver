@@ -2,7 +2,34 @@
 #include "utils.hpp"
 
 #include <trid_cpu.h>
-#include <trid_mpi_cpu.h>
+#include <trid_mpi_cpu.hpp>
+
+#include <mpi.h>
+
+#include <chrono>
+#include <cstdlib>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <thread>
+
+// Some routines for debugging
+void random_wait() {
+  std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 500));
+}
+
+template <typename Container>
+void print_array(const std::string &prompt,
+                 const Container &array) {
+  std::stringstream ss;
+  ss << prompt << ": [";
+  for (size_t i = 0; i < array.size(); ++i) {
+    ss << (i == 0 ? "" : ", ") << std::setprecision(10) << array[i];
+  }
+  ss << "]";
+  random_wait();
+  std::cout << ss.str() << std::endl << std::flush;
+}
 
 template <typename Float, unsigned Align>
 void require_allclose(const AlignedArray<Float, Align> &expected,
@@ -29,10 +56,19 @@ void require_allclose(const AlignedArray<Float, Align> &expected,
   }
 }
 
+template <typename Float> struct ToMpiDatatype {};
+
+template <> struct ToMpiDatatype<double> {
+  static const MPI_Datatype value = MPI_DOUBLE;
+};
+
+template <> struct ToMpiDatatype<float> {
+  static const MPI_Datatype value = MPI_FLOAT;
+};
+
 template <typename Float> void test_from_file(const std::string &file_name) {
   MeshLoader<Float> mesh(file_name);
-  AlignedArray<Float, 1> d(mesh.d());
-  assert(mesh.dims.size() == 1 && "Only one dimension is supported");
+  assert(mesh.dims().size() == 1 && "Only one dimension is supported");
 
   int num_proc, rank;
   MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
@@ -44,25 +80,39 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   /* } */
   const size_t global_N = mesh.dims()[mesh.solve_dim()];
   const size_t offset = rank * (global_N / num_proc);
-  const size_t local_N = std::min(global_N / num_proc, global_N - offset);
+  const size_t local_N =
+      rank == num_proc - 1 ? global_N - offset : global_N / num_proc;
   std::vector<Float> aa(local_N), cc(local_N), dd(local_N);
+  AlignedArray<Float, 1> d(mesh.d(), offset, offset + local_N),
+      u(mesh.u(), offset, offset + local_N);
 
   // TODO in input, how is the indexing (starting from 0/1/etc)
-  thomas_forward(mesh.a().data() + offset, mesh.b().data() + offset,
-                 mesh.c().data() + offset, d().data() + offset, nullptr,
-                 aa.data(), cc.data(), dd.data(), local_N, stride);
+  thomas_forward<Float>(mesh.a().data() + offset, mesh.b().data() + offset,
+                        mesh.c().data() + offset, d.data(), nullptr,
+                        aa.data(), cc.data(), dd.data(), local_N, stride);
 
-  std::vector<Float> send_buf(6), receive_buf();
+  std::vector<Float> send_buf(6), receive_buf(6 * num_proc);
   send_buf[0] = aa[0];
   send_buf[1] = aa[local_N - 1];
-  send_buf[2] = bb[0];
-  send_buf[3] = bb[local_N - 1];
-  send_buf[4] = cc[0];
-  send_buf[5] = cc[local_N - 1];
-  // TODO allgather
+  send_buf[2] = cc[0];
+  send_buf[3] = cc[local_N - 1];
+  send_buf[4] = dd[0];
+  send_buf[5] = dd[local_N - 1];
+  MPI_Allgather(send_buf.data(), 6, ToMpiDatatype<Float>::value,
+                receive_buf.data(), 6, ToMpiDatatype<Float>::value,
+                MPI_COMM_WORLD);
   // Reduced system
   std::vector<Float> aa_r(2 * num_proc), cc_r(2 * num_proc), dd_r(2 * num_proc);
-  // TODO extract aa_r, etc.
+  for (int i = 0; i < num_proc; ++i) {
+    aa_r[2 * i + 0] = receive_buf[6 * i + 0];
+    aa_r[2 * i + 1] = receive_buf[6 * i + 1];
+    cc_r[2 * i + 0] = receive_buf[6 * i + 2];
+    cc_r[2 * i + 1] = receive_buf[6 * i + 3];
+    dd_r[2 * i + 0] = receive_buf[6 * i + 4];
+    dd_r[2 * i + 1] = receive_buf[6 * i + 5];
+  }
+  // indexing of cc_r, dd_r starts from 0
+  // while indexing of aa_r starts from 1
   thomas_on_reduced(aa_r.data(), cc_r.data(), dd_r.data(), 2 * num_proc,
                     stride);
 
@@ -70,7 +120,7 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   dd[local_N - 1] = dd_r[2 * rank + 1];
   thomas_backward(aa.data(), cc.data(), dd.data(), d.data(), local_N, stride);
 
-  require_allclose(mesh.u(), d, global_N, 1);
+  require_allclose(u, d, local_N, 1);
 }
 
 TEST_CASE("mpi: small") {
