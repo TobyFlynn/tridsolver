@@ -131,3 +131,12 @@ TEST_CASE("mpi: small") {
     SECTION("ndims: 1") { test_from_file<double>("files/one_dim_small"); }
   }
 }
+
+TEST_CASE("mpi: large") {
+  SECTION("double") {
+    SECTION("ndims: 1") { test_from_file<double>("files/one_dim_large"); }
+  }
+  SECTION("float") {
+    SECTION("ndims: 1") { test_from_file<double>("files/one_dim_large"); }
+  }
+}
