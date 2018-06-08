@@ -8,8 +8,8 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <thread>
 
@@ -19,8 +19,7 @@ void random_wait() {
 }
 
 template <typename Container>
-void print_array(const std::string &prompt,
-                 const Container &array) {
+void print_array(const std::string &prompt, const Container &array) {
   std::stringstream ss;
   ss << prompt << ": [";
   for (size_t i = 0; i < array.size(); ++i) {
@@ -83,12 +82,15 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   const size_t local_N =
       rank == num_proc - 1 ? global_N - offset : global_N / num_proc;
   std::vector<Float> aa(local_N), cc(local_N), dd(local_N);
-  AlignedArray<Float, 1> d(mesh.d(), offset, offset + local_N),
+  // Simulate distributed environment: only load our data
+  const AlignedArray<Float, 1> a(mesh.a(), offset, offset + local_N),
+      b(mesh.b(), offset, offset + local_N),
+      c(mesh.c(), offset, offset + local_N),
       u(mesh.u(), offset, offset + local_N);
+  AlignedArray<Float, 1> d(mesh.d(), offset, offset + local_N);
 
   // TODO in input, how is the indexing (starting from 0/1/etc)
-  thomas_forward<Float>(mesh.a().data() + offset, mesh.b().data() + offset,
-                        mesh.c().data() + offset, d.data(), nullptr,
+  thomas_forward<Float>(a.data(), b.data(), c.data(), d.data(), nullptr,
                         aa.data(), cc.data(), dd.data(), local_N, stride);
 
   std::vector<Float> send_buf(6), receive_buf(6 * num_proc);
@@ -116,7 +118,7 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   thomas_on_reduced(aa_r.data(), cc_r.data(), dd_r.data(), 2 * num_proc,
                     stride);
 
-  dd[0] = dd_r[2 * rank]; // TODO check this
+  dd[0] = dd_r[2 * rank];
   dd[local_N - 1] = dd_r[2 * rank + 1];
   thomas_backward(aa.data(), cc.data(), dd.data(), d.data(), local_N, stride);
 
