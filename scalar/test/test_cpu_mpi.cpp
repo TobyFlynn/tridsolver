@@ -23,7 +23,7 @@ void print_array(const std::string &prompt, const Container &array) {
   std::stringstream ss;
   ss << prompt << ": [";
   for (size_t i = 0; i < array.size(); ++i) {
-    ss << (i == 0 ? "" : ", ") << std::setprecision(10) << array[i];
+    ss << (i == 0 ? "" : ", ") << std::setprecision(2) << array[i];
   }
   ss << "]";
   random_wait();
@@ -66,79 +66,138 @@ template <> struct ToMpiDatatype<float> {
 };
 
 template <typename Float> void test_from_file(const std::string &file_name) {
+  // The dimension of the MPI decomposition is the same as solve_dim
   MeshLoader<Float> mesh(file_name);
-  assert(mesh.dims().size() == 1 && "Only one dimension is supported");
 
   int num_proc, rank;
   MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  int stride = 1;
-  /* for (size_t i = 0; i < mesh.solve_dim(); ++i) { */
-  /*   stride *= mesh.dims()[i]; */
-  /* } */
-  const size_t global_N = mesh.dims()[mesh.solve_dim()];
-  const size_t offset = rank * (global_N / num_proc);
-  const size_t local_N =
-      rank == num_proc - 1 ? global_N - offset : global_N / num_proc;
-  std::vector<Float> aa(local_N), cc(local_N), dd(local_N);
-  // Simulate distributed environment: only load our data
-  const AlignedArray<Float, 1> a(mesh.a(), offset, offset + local_N),
-      b(mesh.b(), offset, offset + local_N),
-      c(mesh.c(), offset, offset + local_N),
-      u(mesh.u(), offset, offset + local_N);
-  AlignedArray<Float, 1> d(mesh.d(), offset, offset + local_N);
+  // Representation is row major: 0th dimension is the consecutive one
+  int eq_stride = 1;
+  for (size_t i = 0; i < mesh.solve_dim(); ++i) {
+    eq_stride *= mesh.dims()[i];
+  }
+  // The product of the sizes along the dimensions higher than solve_dim; needed
+  // for the iteration later
+  int outer_size = 1;
+  for (size_t i = mesh.solve_dim() + 1; i < mesh.dims().size(); ++i) {
+    outer_size *= mesh.dims()[i];
+  }
+  const size_t eq_size = mesh.dims()[mesh.solve_dim()];
+  // The start index of our domain along the dimension of the MPI
+  // decomposition/solve_dim
+  const size_t mpi_domain_offset = rank * (eq_size / num_proc);
+  // The size of the equations / our domain
+  const size_t local_eq_size =
+      rank == num_proc - 1 ? eq_size - mpi_domain_offset : eq_size / num_proc;
 
-  // TODO in input, how is the indexing (starting from 0/1/etc)
-  thomas_forward<Float>(a.data(), b.data(), c.data(), d.data(), nullptr,
-                        aa.data(), cc.data(), dd.data(), local_N, stride);
-
+  // Local modifications to the coefficients
+  std::vector<Float> aa(local_eq_size), cc(local_eq_size), dd(local_eq_size);
+  // MPI buffers
   std::vector<Float> send_buf(6), receive_buf(6 * num_proc);
-  send_buf[0] = aa[0];
-  send_buf[1] = aa[local_N - 1];
-  send_buf[2] = cc[0];
-  send_buf[3] = cc[local_N - 1];
-  send_buf[4] = dd[0];
-  send_buf[5] = dd[local_N - 1];
-  MPI_Allgather(send_buf.data(), 6, ToMpiDatatype<Float>::value,
-                receive_buf.data(), 6, ToMpiDatatype<Float>::value,
-                MPI_COMM_WORLD);
   // Reduced system
   std::vector<Float> aa_r(2 * num_proc), cc_r(2 * num_proc), dd_r(2 * num_proc);
-  for (int i = 0; i < num_proc; ++i) {
-    aa_r[2 * i + 0] = receive_buf[6 * i + 0];
-    aa_r[2 * i + 1] = receive_buf[6 * i + 1];
-    cc_r[2 * i + 0] = receive_buf[6 * i + 2];
-    cc_r[2 * i + 1] = receive_buf[6 * i + 3];
-    dd_r[2 * i + 0] = receive_buf[6 * i + 4];
-    dd_r[2 * i + 1] = receive_buf[6 * i + 5];
+
+  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+    const size_t domain_start =
+        outer_ind * eq_size * eq_stride + mpi_domain_offset * eq_stride;
+    const size_t domain_size = local_eq_size * eq_stride;
+    // Simulate distributed environment: only load our data
+    const AlignedArray<Float, 1> a(mesh.a(), domain_start,
+                                   domain_start + domain_size),
+        b(mesh.b(), domain_start, domain_start + domain_size),
+        c(mesh.c(), domain_start, domain_start + domain_size),
+        u(mesh.u(), domain_start, domain_start + domain_size);
+    AlignedArray<Float, 1> d(mesh.d(), domain_start,
+                             domain_start + domain_size);
+
+    for (size_t local_eq_start = 0; local_eq_start < eq_stride;
+         ++local_eq_start) {
+
+      thomas_forward<Float>(
+          a.data() + local_eq_start, b.data() + local_eq_start,
+          c.data() + local_eq_start, d.data() + local_eq_start, nullptr,
+          aa.data(), cc.data(), dd.data(), local_eq_size, eq_stride);
+
+      send_buf[0] = aa[0];
+      send_buf[1] = aa[local_eq_size - 1];
+      send_buf[2] = cc[0];
+      send_buf[3] = cc[local_eq_size - 1];
+      send_buf[4] = dd[0];
+      send_buf[5] = dd[local_eq_size - 1];
+      MPI_Allgather(send_buf.data(), 6, ToMpiDatatype<Float>::value,
+                    receive_buf.data(), 6, ToMpiDatatype<Float>::value,
+                    MPI_COMM_WORLD);
+      for (int i = 0; i < num_proc; ++i) {
+        aa_r[2 * i + 0] = receive_buf[6 * i + 0];
+        aa_r[2 * i + 1] = receive_buf[6 * i + 1];
+        cc_r[2 * i + 0] = receive_buf[6 * i + 2];
+        cc_r[2 * i + 1] = receive_buf[6 * i + 3];
+        dd_r[2 * i + 0] = receive_buf[6 * i + 4];
+        dd_r[2 * i + 1] = receive_buf[6 * i + 5];
+      }
+
+      // indexing of cc_r, dd_r starts from 0
+      // while indexing of aa_r starts from 1
+      thomas_on_reduced(aa_r.data(), cc_r.data(), dd_r.data(), 2 * num_proc, 1);
+
+      dd[0] = dd_r[2 * rank];
+      dd[local_eq_size - 1] = dd_r[2 * rank + 1];
+      thomas_backward(aa.data(), cc.data(), dd.data(),
+                      d.data() + local_eq_start, local_eq_size, eq_stride);
+
+    }
+    require_allclose(u, d, domain_size, 1);
   }
-  // indexing of cc_r, dd_r starts from 0
-  // while indexing of aa_r starts from 1
-  thomas_on_reduced(aa_r.data(), cc_r.data(), dd_r.data(), 2 * num_proc,
-                    stride);
-
-  dd[0] = dd_r[2 * rank];
-  dd[local_N - 1] = dd_r[2 * rank + 1];
-  thomas_backward(aa.data(), cc.data(), dd.data(), d.data(), local_N, stride);
-
-  require_allclose(u, d, local_N, 1);
 }
 
 TEST_CASE("mpi: small") {
   SECTION("double") {
     SECTION("ndims: 1") { test_from_file<double>("files/one_dim_small"); }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_from_file<double>("files/two_dim_small_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<double>("files/two_dim_small_solve1");
+      }
+    }
   }
   SECTION("float") {
-    SECTION("ndims: 1") { test_from_file<double>("files/one_dim_small"); }
+    SECTION("ndims: 1") { test_from_file<float>("files/one_dim_small"); }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_from_file<float>("files/two_dim_small_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<float>("files/two_dim_small_solve1");
+      }
+    }
   }
 }
 
-TEST_CASE("mpi: large") {
+TEST_CASE("mpi: large", "[large]") {
   SECTION("double") {
     SECTION("ndims: 1") { test_from_file<double>("files/one_dim_large"); }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_from_file<double>("files/two_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<double>("files/two_dim_large_solve1");
+      }
+    }
   }
   SECTION("float") {
-    SECTION("ndims: 1") { test_from_file<double>("files/one_dim_large"); }
+    SECTION("ndims: 1") { test_from_file<float>("files/one_dim_large"); }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_from_file<float>("files/two_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<float>("files/two_dim_large_solve1");
+      }
+    }
   }
 }

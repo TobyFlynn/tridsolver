@@ -33,12 +33,20 @@ public:
   void allocate(size_t capacity);
 
   T *data() { return reinterpret_cast<T *>(padded_data + padding); }
+
   const T *data() const {
     return reinterpret_cast<const T *>(padded_data + padding);
   }
 
-  T &operator[](size_t index) { return data()[index]; }
-  const T &operator[](size_t index) const { return data()[index]; }
+  T &operator[](size_t index) {
+    assert(index < _size);
+    return data()[index];
+  }
+
+  const T &operator[](size_t index) const {
+    assert(index < _size);
+    return data()[index];
+  }
 
   size_t size() const { return _size; }
 
@@ -154,6 +162,7 @@ template <typename Float, unsigned Align>
 MeshLoader<Float, Align>::MeshLoader(const std::string &file_name)
     : _a{}, _b{}, _c{}, _d{}, _u{} {
   std::ifstream f(file_name);
+  assert(f.good() && "Couldn't open file");
   size_t num_dims;
   f >> num_dims >> _solve_dim;
   // Load sizes along the different dimensions

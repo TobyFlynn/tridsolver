@@ -40,53 +40,6 @@
 
 #define N_MPI_MAX 128
 
-////
-//// Thomas solver for reduced system
-////
-//template<typename REAL>
-//inline void pcr_on_reduced(void** a, void** c, void** d, int N, int stride) {
-//  
-//  REAL b;
-//  int s=1;
-//  REAL a2_array[N_MPI_MAX], c2_array[N_MPI_MAX], d2_array[N_MPI_MAX];
-//  REAL *a2 = a2_array;
-//  REAL *c2 = c2_array;
-//  REAL *d2 = d2_array;
-//
-//  REAL *a_tmp, *c_tmp, *d_tmp;
-//
-//  int P = ceil(log2((double)N));
-//
-//  for(int i=0; i<N; i+=2) {
-//    b       = static_cast<REAL>(1.0) - a[i+1] * c[i] - c[i+1] * a[i+2];
-//    b       = static_cast<REAL>(1.0) / b;
-//    d2[i+1] =   b * (d[i+1] - a[i+1] * d[i] - c[i+1] * d[i+2]);
-//    a2[i+1] = - b * a[i+1] * a[i];
-//    c2[i+1] = - b * c[i+1] * c[i+2];
-//  }
-//
-//  for(int p=1; p<P; p++) {
-//    int s = 1 << p;
-//    for(int i=0; i<N; i+=2) {
-//      b       = static_cast<REAL>(1.0) - a[i+1] * c[i+s+1] - c[i+1] * a[i+s+2];
-//      b       = static_cast<REAL>(1.0) / b;
-//      d2[i+1] = 1;//  b * (d[i+1] - a[i+1] * d[i-s+1] - c[i+1] * d[i+s+1]);
-//      a2[i+1] = - b * a[i+1] * a[i+1-s];
-//      c2[i+1] = - b * c[i+1] * c[i+1+s];
-//    }    
-//    a_tmp = a2;
-//    a2    = a;
-//    a     = a_tmp;
-//    c_tmp = c2;
-//    c2    = c;
-//    c     = c_tmp;
-//    d_tmp = d2;
-//    d2    = d;
-//    d     = d_tmp;
-//  }
-//}
-
-
 //
 // Thomas solver for reduced system
 //
@@ -133,6 +86,9 @@ inline void thomas_on_reduced(
 //
 // Modified Thomas forwards pass
 //
+// Each array should have a size of N, although the first element of a (a[0]) in
+// the first process and the last element of c in the last process will not be
+// used eventually
 template<typename REAL>
 inline void thomas_forward(
     const REAL *__restrict__ a, 
@@ -151,24 +107,22 @@ inline void thomas_forward(
   if(N >=2) {
     // Start lower off-diagonal elimination
     for(int i=0; i<2; i++) {
-      bbi   = static_cast<REAL>(1.0) / b[i];
-      //dd[i] = 66;//d[i] * bbi;
-      dd[i] = d[i] * bbi;
-      aa[i] = a[i] * bbi;
-      cc[i] = c[i] * bbi;
+      bbi   = static_cast<REAL>(1.0) / b[i * stride];
+      dd[i] = d[i * stride] * bbi;
+      aa[i] = a[i * stride] * bbi;
+      cc[i] = c[i * stride] * bbi;
     }
     if(N >=3 ) {
       // Eliminate lower off-diagonal
       for(int i=2; i<N; i++) {
-        bbi   = static_cast<REAL>(1.0) / (b[i] - a[i] * cc[i-1]); 
-        //dd[i] = 77;//(d[i] - a[i]*dd[i-1]) * bbi;
-        dd[i] = (d[i] - a[i]*dd[i-1]) * bbi;
-        aa[i] = (     - a[i]*aa[i-1]) * bbi;
-        cc[i] =                 c[i]  * bbi;
+        bbi = static_cast<REAL>(1.0) /
+              (b[i * stride] - a[i * stride] * cc[i - 1]);
+        dd[i] = (d[i * stride] - a[i * stride] * dd[i - 1]) * bbi;
+        aa[i] = (              - a[i * stride] * aa[i - 1]) * bbi;
+        cc[i] =  c[i * stride]                              * bbi;
       }
       // Eliminate upper off-diagonal
       for(int i=N-3; i>0; i--) {
-        //dd[i] = 88;//dd[i] - cc[i]*dd[i+1];
         dd[i] = dd[i] - cc[i]*dd[i+1];
         aa[i] = aa[i] - cc[i]*aa[i+1];
         cc[i] =       - cc[i]*cc[i+1];
@@ -201,9 +155,8 @@ inline void thomas_backward(
   d[0] = dd[0];
   #pragma ivdep
   for (int i=1; i<N-1; i++) {
-    //d[i] = dd[i];//dd[i] - aa[i]*dd[0] - cc[i]*dd[N-1];
-    d[i] = dd[i] - aa[i]*dd[0] - cc[i]*dd[N-1];
+    d[i * stride] = dd[i] - aa[i]*dd[0] - cc[i]*dd[N-1];
   }
-  d[N-1] = dd[N-1];
+  d[(N-1) * stride] = dd[N-1];
 }
 #endif
