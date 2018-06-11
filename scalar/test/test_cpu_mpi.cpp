@@ -1,4 +1,6 @@
+#define CATCH_CONFIG_NOSTDOUT
 #include "catch.hpp"
+#include "catch_mpi_outputs.hpp"
 #include "utils.hpp"
 
 #include <trid_cpu.h>
@@ -13,21 +15,14 @@
 #include <sstream>
 #include <thread>
 
-// Some routines for debugging
-void random_wait() {
-  std::this_thread::sleep_for(std::chrono::milliseconds(std::rand() % 500));
-}
-
+// Print routine for debugging
 template <typename Container>
 void print_array(const std::string &prompt, const Container &array) {
-  std::stringstream ss;
-  ss << prompt << ": [";
+  Catch::cout() << prompt << ": [";
   for (size_t i = 0; i < array.size(); ++i) {
-    ss << (i == 0 ? "" : ", ") << std::setprecision(2) << array[i];
+    Catch::cout() << (i == 0 ? "" : ", ") << std::setprecision(2) << array[i];
   }
-  ss << "]";
-  random_wait();
-  std::cout << ss.str() << std::endl << std::flush;
+  Catch::cout() << "]\n";
 }
 
 template <typename Float, unsigned Align>
@@ -146,7 +141,6 @@ template <typename Float> void test_from_file(const std::string &file_name) {
       dd[local_eq_size - 1] = dd_r[2 * rank + 1];
       thomas_backward(aa.data(), cc.data(), dd.data(),
                       d.data() + local_eq_start, local_eq_size, eq_stride);
-
     }
     require_allclose(u, d, domain_size, 1);
   }
