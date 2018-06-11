@@ -2,6 +2,7 @@
 #include "catch.hpp"
 
 #include <mpi.h>
+#include <cstdlib>
 
 int main(int argc, char *argv[])
 {
@@ -10,6 +11,11 @@ int main(int argc, char *argv[])
     printf("Error starting MPI program. Terminating.\n");
     MPI_Abort(MPI_COMM_WORLD, rc);
   }
+
+  // For the debug prints
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  std::srand(rank);
 
   int result = Catch::Session().run(argc, argv);
 
