@@ -8,6 +8,7 @@ PRECISION_FLOAT=6
 
 def calc_result(a, b, c, d, axis, precision = 0):
     """
+    :axis:      the axis along which the equations are defined
     :precision: if 0 then use the full precision, else round the inputs to
                 precision decimals before solving
     """
@@ -47,27 +48,27 @@ def write_testcase(fname, a, b, c, d, u, u_float, solvedim):
         # Sizes in different dimensions
         f.write(' '.join([str(size) for size in a.shape]))
         f.write('\n')
-        # a matrix, in row major format
+        # a matrix, in column major format
         f.write(' '.join([str(round(val, PRECISION))
                           for val in a.flatten(order = 'F')]))
         f.write('\n')
-        # b matrix, in row major format
+        # b matrix, in column major format
         f.write(' '.join([str(round(val, PRECISION))
                           for val in b.flatten(order = 'F')]))
         f.write('\n')
-        # c matrix, in row major format
+        # c matrix, in column major format
         f.write(' '.join([str(round(val, PRECISION))
                           for val in c.flatten(order = 'F')]))
         f.write('\n')
-        # d matrix, in row major format
+        # d matrix, in column major format
         f.write(' '.join([str(round(val, PRECISION))
                           for val in d.flatten(order = 'F')]))
         f.write('\n')
-        # u matrix, in row major format
+        # u matrix, in column major format
         f.write(' '.join([str(round(val, PRECISION))
                           for val in u.flatten(order = 'F')]))
         f.write('\n')
-        # u matrix in float precision, in row major format
+        # u matrix in float precision, in column major format
         f.write(' '.join([str(round(val, PRECISION_FLOAT))
                           for val in u_float.flatten(order = 'F')]))
         f.write('\n')
