@@ -89,6 +89,13 @@ def main():
     gen_testcase('two_dim_small_solve1', [8, 8], 1)
     gen_testcase('two_dim_large_solve0', [32, 32], 0)
     gen_testcase('two_dim_large_solve1', [32, 32], 1)
+    gen_testcase('three_dim_large_solve0', [32, 32, 32], 0)
+    gen_testcase('three_dim_large_solve1', [32, 32, 32], 1)
+    gen_testcase('three_dim_large_solve2', [32, 32, 32], 2)
+    gen_testcase('four_dim_large_solve0', [32, 32, 32, 32], 0)
+    gen_testcase('four_dim_large_solve1', [32, 32, 32, 32], 1)
+    gen_testcase('four_dim_large_solve2', [32, 32, 32, 32], 2)
+    gen_testcase('four_dim_large_solve3', [32, 32, 32, 32], 3)
 
 if __name__ == "__main__":
     main()

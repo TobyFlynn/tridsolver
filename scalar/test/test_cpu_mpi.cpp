@@ -182,6 +182,31 @@ TEST_CASE("mpi: large", "[large]") {
         test_from_file<double>("files/two_dim_large_solve1");
       }
     }
+    SECTION("ndims: 3") {
+      SECTION("solvedim: 0") {
+        test_from_file<double>("files/three_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<double>("files/three_dim_large_solve1");
+      }
+      SECTION("solvedim: 2") {
+        test_from_file<double>("files/three_dim_large_solve2");
+      }
+    }
+    SECTION("ndims: 4") {
+      SECTION("solvedim: 0") {
+        test_from_file<double>("files/four_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<double>("files/four_dim_large_solve1");
+      }
+      SECTION("solvedim: 2") {
+        test_from_file<double>("files/four_dim_large_solve2");
+      }
+      SECTION("solvedim: 3") {
+        test_from_file<double>("files/four_dim_large_solve2");
+      }
+    }
   }
   SECTION("float") {
     SECTION("ndims: 1") { test_from_file<float>("files/one_dim_large"); }
@@ -191,6 +216,31 @@ TEST_CASE("mpi: large", "[large]") {
       }
       SECTION("solvedim: 1") {
         test_from_file<float>("files/two_dim_large_solve1");
+      }
+    }
+    SECTION("ndims: 3") {
+      SECTION("solvedim: 0") {
+        test_from_file<float>("files/three_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<float>("files/three_dim_large_solve1");
+      }
+      SECTION("solvedim: 2") {
+        test_from_file<float>("files/three_dim_large_solve2");
+      }
+    }
+    SECTION("ndims: 4") {
+      SECTION("solvedim: 0") {
+        test_from_file<float>("files/four_dim_large_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_from_file<float>("files/four_dim_large_solve1");
+      }
+      SECTION("solvedim: 2") {
+        test_from_file<float>("files/four_dim_large_solve2");
+      }
+      SECTION("solvedim: 3") {
+        test_from_file<float>("files/four_dim_large_solve2");
       }
     }
   }
