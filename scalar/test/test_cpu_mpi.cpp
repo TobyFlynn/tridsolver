@@ -68,7 +68,7 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  // Representation is row major: 0th dimension is the consecutive one
+  // Representation is column major: 0th dimension is the consecutive one
   int eq_stride = 1;
   for (size_t i = 0; i < mesh.solve_dim(); ++i) {
     eq_stride *= mesh.dims()[i];
