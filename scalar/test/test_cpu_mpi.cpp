@@ -146,6 +146,60 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   }
 }
 
+template <typename Float>
+void test_solver_from_file(const std::string &file_name) {
+  // The dimension of the MPI decomposition is the same as solve_dim
+  MeshLoader<Float> mesh(file_name);
+
+  int num_proc, rank;
+  MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  // The product of the sizes along the dimensions higher than solve_dim; needed
+  // for the iteration later
+  int outer_size = 1;
+  for (size_t i = mesh.solve_dim() + 1; i < mesh.dims().size(); ++i) {
+    outer_size *= mesh.dims()[i];
+  }
+  int eq_stride = 1;
+  for (size_t i = 0; i < mesh.solve_dim(); ++i) {
+    eq_stride *= mesh.dims()[i];
+  }
+  const size_t eq_size = mesh.dims()[mesh.solve_dim()];
+  // The start index of our domain along the dimension of the MPI
+  // decomposition/solve_dim
+  const size_t mpi_domain_offset = rank * (eq_size / num_proc);
+  // The size of the equations / our domain
+  const size_t local_eq_size =
+      rank == num_proc - 1 ? eq_size - mpi_domain_offset : eq_size / num_proc;
+
+  MpiSolverParams params{MPI_COMM_WORLD,
+                         mesh.dims().data(),
+                         mesh.dims().size(),
+                         mesh.solve_dim(),
+                         mesh.solve_dim(),
+                         num_proc,
+                         rank,
+                         local_eq_size};
+
+  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+    const size_t domain_start =
+        outer_ind * eq_size * eq_stride + mpi_domain_offset * eq_stride;
+    const size_t domain_size = local_eq_size * eq_stride;
+    // Simulate distributed environment: only load our data
+    const AlignedArray<Float, 1> a(mesh.a(), domain_start,
+                                   domain_start + domain_size),
+        b(mesh.b(), domain_start, domain_start + domain_size),
+        c(mesh.c(), domain_start, domain_start + domain_size),
+        u(mesh.u(), domain_start, domain_start + domain_size);
+    AlignedArray<Float, 1> d(mesh.d(), domain_start,
+                             domain_start + domain_size);
+
+    trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data());
+    require_allclose(u, d, domain_size, 1);
+  }
+}
+
 TEST_CASE("mpi: small") {
   SECTION("double") {
     SECTION("ndims: 1") { test_from_file<double>("files/one_dim_small"); }
@@ -241,6 +295,33 @@ TEST_CASE("mpi: large", "[large]") {
       }
       SECTION("solvedim: 3") {
         test_from_file<float>("files/four_dim_large_solve2");
+      }
+    }
+  }
+}
+
+TEST_CASE("mpi: solver small") {
+  SECTION("double") {
+    SECTION("ndims: 1") {
+      test_solver_from_file<double>("files/one_dim_small");
+    }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_solver_from_file<double>("files/two_dim_small_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_solver_from_file<double>("files/two_dim_small_solve1");
+      }
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 1") { test_solver_from_file<float>("files/one_dim_small"); }
+    SECTION("ndims: 2") {
+      SECTION("solvedim: 0") {
+        test_solver_from_file<float>("files/two_dim_small_solve0");
+      }
+      SECTION("solvedim: 1") {
+        test_solver_from_file<float>("files/two_dim_small_solve1");
       }
     }
   }
