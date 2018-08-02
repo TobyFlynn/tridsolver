@@ -182,22 +182,30 @@ void test_solver_from_file(const std::string &file_name) {
                          rank,
                          local_eq_size};
 
+  // Simulate distributed environment: only load our data
+  const size_t domain_size = outer_size * local_eq_size * eq_stride;
+  AlignedArray<Float, 1> a(domain_size), b(domain_size), c(domain_size),
+      u(domain_size), d(domain_size);
   for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+    // Start of the domain for the slice defined by `outer_ind` in the global
+    // mesh along the dimension of the decomposition.
     const size_t domain_start =
         outer_ind * eq_size * eq_stride + mpi_domain_offset * eq_stride;
-    const size_t domain_size = local_eq_size * eq_stride;
-    // Simulate distributed environment: only load our data
-    const AlignedArray<Float, 1> a(mesh.a(), domain_start,
-                                   domain_start + domain_size),
-        b(mesh.b(), domain_start, domain_start + domain_size),
-        c(mesh.c(), domain_start, domain_start + domain_size),
-        u(mesh.u(), domain_start, domain_start + domain_size);
-    AlignedArray<Float, 1> d(mesh.d(), domain_start,
-                             domain_start + domain_size);
-
-    trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data());
-    require_allclose(u, d, domain_size, 1);
+    // Copy the data
+    for (size_t i = 0; i < local_eq_size * eq_stride; ++i) {
+      a.push_back(mesh.a()[domain_start + i]);
+      b.push_back(mesh.b()[domain_start + i]);
+      c.push_back(mesh.c()[domain_start + i]);
+      d.push_back(mesh.d()[domain_start + i]);
+      u.push_back(mesh.u()[domain_start + i]);
+    }
   }
+
+  // Solve the equations
+  trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data());
+
+  // Check result
+  require_allclose(u, d, domain_size, 1);
 }
 
 TEST_CASE("mpi: small") {

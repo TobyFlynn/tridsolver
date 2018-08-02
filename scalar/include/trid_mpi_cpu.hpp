@@ -189,14 +189,29 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
          "trid_solve_mpi: only the case when the MPI decomposition dimension "
          "is the same as the dimension of the equation is supported");
   assert(params.equation_dim < params.num_dims);
-  assert((std::is_same<REAL, float>::value ||
-          std::is_same<REAL, double>::value &&
-              "trid_solve_mpi: only double or float values are supported"));
+  assert((
+      (std::is_same<REAL, float>::value || std::is_same<REAL, double>::value) &&
+      "trid_solve_mpi: only double or float values are supported"));
 
   int eq_stride = 1;
   for (size_t i = 0; i < params.equation_dim; ++i) {
     eq_stride *= params.size[i];
   }
+  // The product of the sizes along the dimensions higher than solve_dim; needed
+  // for the iteration later
+  int outer_size = 1;
+  for (size_t i = params.equation_dim + 1; i < params.num_dims; ++i) {
+    outer_size *= params.size[i];
+  }
+  const size_t eq_size = params.size[params.equation_dim];
+  // The start index of our domain along the dimension of the MPI
+  // decomposition/solve_dim
+  const size_t mpi_domain_offset =
+      params.mpi_rank * (eq_size / params.num_mpi_procs);
+  // The size of the equations / our domain
+  const size_t local_eq_size = params.mpi_rank == params.num_mpi_procs - 1
+                                   ? eq_size - mpi_domain_offset
+                                   : eq_size / params.num_mpi_procs;
 
   const MPI_Datatype real_datatype =
       std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
@@ -211,39 +226,47 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
       cc_r(2 * params.num_mpi_procs), dd_r(2 * params.num_mpi_procs);
 
   // Calculation
-  for (size_t local_eq_start = 0; local_eq_start < eq_stride;
-       ++local_eq_start) {
-    thomas_forward<REAL>(a + local_eq_start, b + local_eq_start,
-                         c + local_eq_start, d + local_eq_start, nullptr,
-                         aa.data(), cc.data(), dd.data(),
-                         params.local_equation_size, eq_stride);
+  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+    // Start of the domain for the slice defined by `outer_ind` in the global
+    // mesh along the dimension of the decomposition. (Note: the arrays only
+    // contain the local data.)
+    const size_t domain_start = outer_ind * local_eq_size * eq_stride;
+    for (size_t local_eq_start = 0; local_eq_start < eq_stride;
+         ++local_eq_start) {
+      const size_t equation_offset = domain_start + local_eq_start;
+      thomas_forward<REAL>(a + equation_offset, b + equation_offset,
+                           c + equation_offset, d + equation_offset, nullptr,
+                           aa.data(), cc.data(), dd.data(),
+                           params.local_equation_size, eq_stride);
 
-    send_buf[0] = aa[0];
-    send_buf[1] = aa[params.local_equation_size - 1];
-    send_buf[2] = cc[0];
-    send_buf[3] = cc[params.local_equation_size - 1];
-    send_buf[4] = dd[0];
-    send_buf[5] = dd[params.local_equation_size - 1];
-    MPI_Allgather(send_buf.data(), 6, real_datatype, receive_buf.data(), 6,
-                  real_datatype, MPI_COMM_WORLD);
-    for (int i = 0; i < params.num_mpi_procs; ++i) {
-      aa_r[2 * i + 0] = receive_buf[6 * i + 0];
-      aa_r[2 * i + 1] = receive_buf[6 * i + 1];
-      cc_r[2 * i + 0] = receive_buf[6 * i + 2];
-      cc_r[2 * i + 1] = receive_buf[6 * i + 3];
-      dd_r[2 * i + 0] = receive_buf[6 * i + 4];
-      dd_r[2 * i + 1] = receive_buf[6 * i + 5];
+      send_buf[0] = aa[0];
+      send_buf[1] = aa[params.local_equation_size - 1];
+      send_buf[2] = cc[0];
+      send_buf[3] = cc[params.local_equation_size - 1];
+      send_buf[4] = dd[0];
+      send_buf[5] = dd[params.local_equation_size - 1];
+      MPI_Allgather(send_buf.data(), 6, real_datatype, receive_buf.data(), 6,
+                    real_datatype, params.communicator);
+      for (int i = 0; i < params.num_mpi_procs; ++i) {
+        aa_r[2 * i + 0] = receive_buf[6 * i + 0];
+        aa_r[2 * i + 1] = receive_buf[6 * i + 1];
+        cc_r[2 * i + 0] = receive_buf[6 * i + 2];
+        cc_r[2 * i + 1] = receive_buf[6 * i + 3];
+        dd_r[2 * i + 0] = receive_buf[6 * i + 4];
+        dd_r[2 * i + 1] = receive_buf[6 * i + 5];
+      }
+
+      // indexing of cc_r, dd_r starts from 0
+      // while indexing of aa_r starts from 1
+      thomas_on_reduced<REAL>(aa_r.data(), cc_r.data(), dd_r.data(),
+                              2 * params.num_mpi_procs, 1);
+
+      dd[0] = dd_r[2 * params.mpi_rank];
+      dd[params.local_equation_size - 1] = dd_r[2 * params.mpi_rank + 1];
+      thomas_backward<REAL>(aa.data(), cc.data(), dd.data(),
+                            d + equation_offset, params.local_equation_size,
+                            eq_stride);
     }
-
-    // indexing of cc_r, dd_r starts from 0
-    // while indexing of aa_r starts from 1
-    thomas_on_reduced(aa_r.data(), cc_r.data(), dd_r.data(),
-                      2 * params.num_mpi_procs, 1);
-
-    dd[0] = dd_r[2 * params.mpi_rank];
-    dd[params.local_equation_size - 1] = dd_r[2 * params.mpi_rank + 1];
-    thomas_backward(aa.data(), cc.data(), dd.data(), d + local_eq_start,
-                    params.local_equation_size, eq_stride);
   }
 }
 
