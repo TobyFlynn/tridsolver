@@ -179,8 +179,7 @@ void test_solver_from_file(const std::string &file_name) {
                          mesh.solve_dim(),
                          mesh.solve_dim(),
                          num_proc,
-                         rank,
-                         local_eq_size};
+                         rank};
 
   // Simulate distributed environment: only load our data
   const size_t domain_size = outer_size * local_eq_size * eq_stride;
