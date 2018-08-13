@@ -156,18 +156,58 @@ struct MpiSolverParams {
   // Communicator that includes every node calculating the same set of
   // equations as the current node.
   MPI_Comm communicator;
-  // The size of the mesh; must be a `num_dims` large array.
+  // The size of the local domain; must be a `num_dims` large array. It won't be
+  // owned.
   const int *size;
+  // The number of MPI processes in each dimension. It is `num_dims` large. It
+  // won't be owned.
+  const int *num_mpi_procs;
   // The number of dimensions in the mesh.
   int num_dims;
   // The index of the dimension along which the equations are defined.
   int equation_dim;
-  // The index of the dimension along which the domain is decomposed.
-  int domain_decomposition_dim;
-  // The number of MPI processes.
-  int num_mpi_procs;
-  // The MPI rank of the current process.
-  int mpi_rank;
+  // The MPI coordinate of the current process along the dimension of the
+  // equations.
+  int mpi_coord;
+
+  // Assumes that the number
+  MpiSolverParams(MPI_Comm cartesian_communicator, int num_dims_,
+                  const int *size_, int equation_dim_,
+                  const int *num_mpi_procs_)
+      : size{size_}, num_mpi_procs{num_mpi_procs_}, num_dims{num_dims_},
+        equation_dim{equation_dim_} {
+    int cart_rank;
+    MPI_Comm_rank(cartesian_communicator, &cart_rank);
+    std::vector<int> coords(num_dims_);
+    MPI_Cart_coords(cartesian_communicator, cart_rank, num_dims_,
+                    coords.data());
+    std::vector<int> neighbours = {cart_rank};
+    this->mpi_coord = coords[equation_dim];
+    // Collect the processes in the same row/column
+    for (int i = 1;
+         i <= std::max(num_mpi_procs[equation_dim] - mpi_coord - 1, mpi_coord);
+         ++i) {
+      int prev, next;
+      MPI_Cart_shift(cartesian_communicator, equation_dim, i, &prev, &next);
+      if (i <= mpi_coord) {
+        neighbours.push_back(prev);
+      }
+      if (i + mpi_coord < num_mpi_procs[equation_dim]) {
+        neighbours.push_back(next);
+      }
+    }
+    // This is needed, otherwise the communications hang
+    std::sort(neighbours.begin(), neighbours.end());
+
+    // Create new communicator for neighbours
+    MPI_Group cart_group;
+    MPI_Comm_group(cartesian_communicator, &cart_group);
+    MPI_Group neighbours_group;
+    MPI_Group_incl(cart_group, neighbours.size(), neighbours.data(),
+                   &neighbours_group);
+    MPI_Comm_create(cartesian_communicator, neighbours_group,
+                    &this->communicator);
+  }
 };
 
 //
@@ -183,9 +223,6 @@ struct MpiSolverParams {
 template <typename REAL>
 inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
                            const REAL *b, const REAL *c, REAL *d) {
-  assert(params.equation_dim == params.domain_decomposition_dim &&
-         "trid_solve_mpi: only the case when the MPI decomposition dimension "
-         "is the same as the dimension of the equation is supported");
   assert(params.equation_dim < params.num_dims);
   assert((
       (std::is_same<REAL, float>::value || std::is_same<REAL, double>::value) &&
@@ -201,15 +238,8 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
   for (size_t i = params.equation_dim + 1; i < params.num_dims; ++i) {
     outer_size *= params.size[i];
   }
-  const size_t eq_size = params.size[params.equation_dim];
-  // The start index of our domain along the dimension of the MPI
-  // decomposition/solve_dim
-  const size_t mpi_domain_offset =
-      params.mpi_rank * (eq_size / params.num_mpi_procs);
   // The size of the equations / our domain
-  const size_t local_eq_size = params.mpi_rank == params.num_mpi_procs - 1
-                                   ? eq_size - mpi_domain_offset
-                                   : eq_size / params.num_mpi_procs;
+  const size_t local_eq_size = params.size[params.equation_dim];
 
   const MPI_Datatype real_datatype =
       std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
@@ -221,7 +251,7 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = 6 * outer_size * eq_stride;
   std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(comm_buf_size * params.num_mpi_procs);
+      receive_buf(comm_buf_size * params.num_mpi_procs[params.equation_dim]);
 
   // Calculation
   // Forward pass
@@ -250,11 +280,14 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
       const size_t comm_buf_offset =
           (outer_ind * eq_stride + local_eq_start) * 6;
       send_buf[comm_buf_offset + 0] = aa[local_array_offset + 0];
-      send_buf[comm_buf_offset + 1] = aa[local_array_offset + local_eq_size - 1];
+      send_buf[comm_buf_offset + 1] =
+          aa[local_array_offset + local_eq_size - 1];
       send_buf[comm_buf_offset + 2] = cc[local_array_offset + 0];
-      send_buf[comm_buf_offset + 3] = cc[local_array_offset + local_eq_size - 1];
+      send_buf[comm_buf_offset + 3] =
+          cc[local_array_offset + local_eq_size - 1];
       send_buf[comm_buf_offset + 4] = dd[local_array_offset + 0];
-      send_buf[comm_buf_offset + 5] = dd[local_array_offset + local_eq_size - 1];
+      send_buf[comm_buf_offset + 5] =
+          dd[local_array_offset + local_eq_size - 1];
     }
   }
 
@@ -280,12 +313,13 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
           (outer_ind * eq_stride + local_eq_start) * local_eq_size;
 
       // Reduced system
-      std::vector<REAL> aa_r(2 * params.num_mpi_procs),
-          cc_r(2 * params.num_mpi_procs), dd_r(2 * params.num_mpi_procs);
+      std::vector<REAL> aa_r(2 * params.num_mpi_procs[params.equation_dim]),
+          cc_r(2 * params.num_mpi_procs[params.equation_dim]),
+          dd_r(2 * params.num_mpi_procs[params.equation_dim]);
       // The offset in the send and receive buffers
       const size_t comm_buf_offset =
           (outer_ind * eq_stride + local_eq_start) * 6;
-      for (int i = 0; i < params.num_mpi_procs; ++i) {
+      for (int i = 0; i < params.num_mpi_procs[params.equation_dim]; ++i) {
         aa_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 0];
         aa_r[2 * i + 1] = receive_buf[comm_buf_size * i + comm_buf_offset + 1];
         cc_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 2];
@@ -297,11 +331,11 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
       // indexing of cc_r, dd_r starts from 0
       // while indexing of aa_r starts from 1
       thomas_on_reduced<REAL>(aa_r.data(), cc_r.data(), dd_r.data(),
-                              2 * params.num_mpi_procs, 1);
+                              2 * params.num_mpi_procs[params.equation_dim], 1);
 
-      dd[local_array_offset + 0] = dd_r[2 * params.mpi_rank];
+      dd[local_array_offset + 0] = dd_r[2 * params.mpi_coord];
       dd[local_array_offset + local_eq_size - 1] =
-          dd_r[2 * params.mpi_rank + 1];
+          dd_r[2 * params.mpi_coord + 1];
       thomas_backward<REAL>(aa.data() + local_array_offset,
                             cc.data() + local_array_offset,
                             dd.data() + local_array_offset, d + equation_offset,

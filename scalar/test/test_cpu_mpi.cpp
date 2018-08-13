@@ -146,6 +146,35 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   }
 }
 
+// Copies the local domain defined by `local_sizes` and `offsets` from the mesh.
+//
+// The 0th dimension is the contiguous one. The function is recursive; `dim` is
+// current dimension, should equal one less than the number of dimensions when
+// called from outside.
+//
+// `global_strides` is the product of the all global sizes in the lower
+// dimensions (e.g. `global_strides[0] == 1`).
+template <typename Float, unsigned Alignment>
+void copy_strided(const AlignedArray<Float, Alignment> &src,
+                  AlignedArray<Float, Alignment> &dest,
+                  const std::vector<int> &local_sizes,
+                  const std::vector<int> &offsets,
+                  const std::vector<int> &global_strides, size_t dim,
+                  int global_offset = 0) {
+  if (dim == 0) {
+    for (int i = 0; i < local_sizes[dim]; ++i) {
+      dest.push_back(src[global_offset + offsets[dim] + i]);
+    }
+  } else {
+    for (int i = 0; i < local_sizes[dim]; ++i) {
+      const int new_global_offset =
+          global_offset + (offsets[dim] + i) * global_strides[dim];
+      copy_strided(src, dest, local_sizes, offsets, global_strides, dim - 1,
+                   new_global_offset);
+    }
+  }
+}
+
 template <typename Float>
 void test_solver_from_file(const std::string &file_name) {
   // The dimension of the MPI decomposition is the same as solve_dim
@@ -155,50 +184,57 @@ void test_solver_from_file(const std::string &file_name) {
   MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  // The product of the sizes along the dimensions higher than solve_dim; needed
-  // for the iteration later
-  int outer_size = 1;
-  for (size_t i = mesh.solve_dim() + 1; i < mesh.dims().size(); ++i) {
-    outer_size *= mesh.dims()[i];
-  }
-  int eq_stride = 1;
-  for (size_t i = 0; i < mesh.solve_dim(); ++i) {
-    eq_stride *= mesh.dims()[i];
-  }
-  const size_t eq_size = mesh.dims()[mesh.solve_dim()];
-  // The start index of our domain along the dimension of the MPI
-  // decomposition/solve_dim
-  const size_t mpi_domain_offset = rank * (eq_size / num_proc);
-  // The size of the equations / our domain
-  const size_t local_eq_size =
-      rank == num_proc - 1 ? eq_size - mpi_domain_offset : eq_size / num_proc;
+  // Create rectangular grid
+  std::vector<int> sides(mesh.dims().size(), 0);
+  MPI_Dims_create(num_proc, mesh.dims().size(), sides.data());
 
-  MpiSolverParams params{MPI_COMM_WORLD,
-                         mesh.dims().data(),
-                         mesh.dims().size(),
-                         mesh.solve_dim(),
-                         mesh.solve_dim(),
-                         num_proc,
-                         rank};
+  // Create communicator for grid
+  MPI_Comm cart_comm;
+  std::vector<int> mpi_dims(mesh.dims().size()), periods(mesh.dims().size());
+  for (size_t i = 0; i < mesh.dims().size(); ++i) {
+    mpi_dims[i] = sides[i];
+    periods[i] = 0;
+  }
+  MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size(), mpi_dims.data(),
+                  periods.data(), 0, &cart_comm);
+  int cart_rank;
+  MPI_Comm_rank(cart_comm, &cart_rank);
+  std::vector<int> coords(mesh.dims().size());
+  MPI_Cart_coords(cart_comm, cart_rank, coords.size(), coords.data());
+
+  // The size of the local domain.
+  std::vector<int> local_sizes(mesh.dims().size());
+  // The starting indices of the local domain in each dimension.
+  std::vector<int> domain_offsets(mesh.dims().size());
+  // The strides in the mesh for each dimension.
+  std::vector<int> global_strides(mesh.dims().size());
+  int domain_size = 1;
+  for (size_t i = 0; i < local_sizes.size(); ++i) {
+    const int global_dim = mesh.dims()[i];
+    domain_offsets[i] = coords[i] * (global_dim / mpi_dims[i]);
+    local_sizes[i] = coords[i] == mpi_dims[i] - 1
+                         ? global_dim - domain_offsets[i]
+                         : global_dim / mpi_dims[i];
+    global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
+    domain_size *= local_sizes[i];
+  }
+
+  MpiSolverParams params(cart_comm, mesh.dims().size(), local_sizes.data(),
+                         mesh.solve_dim(), mpi_dims.data());
 
   // Simulate distributed environment: only load our data
-  const size_t domain_size = outer_size * local_eq_size * eq_stride;
   AlignedArray<Float, 1> a(domain_size), b(domain_size), c(domain_size),
       u(domain_size), d(domain_size);
-  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
-    // Start of the domain for the slice defined by `outer_ind` in the global
-    // mesh along the dimension of the decomposition.
-    const size_t domain_start =
-        outer_ind * eq_size * eq_stride + mpi_domain_offset * eq_stride;
-    // Copy the data
-    for (size_t i = 0; i < local_eq_size * eq_stride; ++i) {
-      a.push_back(mesh.a()[domain_start + i]);
-      b.push_back(mesh.b()[domain_start + i]);
-      c.push_back(mesh.c()[domain_start + i]);
-      d.push_back(mesh.d()[domain_start + i]);
-      u.push_back(mesh.u()[domain_start + i]);
-    }
-  }
+  copy_strided(mesh.a(), a, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.b(), b, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.c(), c, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.d(), d, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.u(), u, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
 
   // Solve the equations
   trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data());
@@ -336,7 +372,9 @@ TEST_CASE("mpi: solver small") {
 
 TEST_CASE("mpi: solver large", "[large]") {
   SECTION("double") {
-    SECTION("ndims: 1") { test_solver_from_file<double>("files/one_dim_large"); }
+    SECTION("ndims: 1") {
+      test_solver_from_file<double>("files/one_dim_large");
+    }
     SECTION("ndims: 2") {
       SECTION("solvedim: 0") {
         test_solver_from_file<double>("files/two_dim_large_solve0");
