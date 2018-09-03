@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 2.8.8)
 
 option(INTEL_CC "Use the Intel compiler." ON) 
-option(BUILD_FOR_CPU "Build library for CPU architecture." OFF) 
+option(INTEL_VECTOR_INTRINSICS "Use Intel vector intrinsics." OFF)
+option(BUILD_FOR_CPU "Build library for CPU architecture." OFF)
 option(BUILD_FOR_MIC "Build library for MIC architecture." OFF) 
 option(BUILD_FOR_GPU "Build library for GPU architecture." OFF) 
 
@@ -54,7 +55,11 @@ else (INTEL_CC)
   set(CMAKE_C_FLAGS         "${CMAKE_CXX_FLAGS}       ${FLAGS_GCC_DEFAULT} -std=c99")
   set(CMAKE_C_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} ${FLAGS_GCC_DEBUG}   -std=c99")
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_RELEASE}     ${FLAGS_GCC_RELEASE} -std=c99") 
-endif (INTEL_CC) 
+endif (INTEL_CC)
+
+if (INTEL_VECTOR_INTRINSICS)
+  set(FLAGS_GCC_DEFAULT "${FLAGS_GCC_DEFAULT -DUSE_INTEL_VECTOR_INTRINSICS}")
+endif (INTEL_VECTOR_INTRINSICS)
 
 # Define maximal length of a scalar tridiagonal system 
 set(N_MAX 1024 CACHE STRING "Maximal length of the internal buffer for storing intermediate c and d vectors of the Thomas algorithm") 

@@ -38,7 +38,8 @@
 
 #include "trid_simd.h"
 
-#ifdef __AVX__
+#ifdef USE_INTEL_VECTOR_INTRINSICS
+#  ifdef __AVX__
 // void transpose8x8_intrinsic(__m256 *ymm ) {
 inline void transpose8x8_intrinsic(__m256 __restrict__ ymm[8]) {
   __m256 tmp[8];
@@ -94,8 +95,8 @@ inline void transpose4x4_intrinsic(__m256d __restrict__ ymm[4]) {
   ymm[3] = _mm256_shuffle_pd(tmp[2], tmp[3], 0b00001111);
 }
 
-#else
-#  ifdef __MIC__
+#  else
+#    ifdef __MIC__
 __attribute__((target(mic)))
 // void transpose16x16_intrinsic( __m512 *zmm ) {
 inline void
@@ -103,7 +104,7 @@ transpose16x16_intrinsic(__m512 __restrict__ zmm[16]) {
   __m512 tmp[16];
 
 // Transpose 2x2 blocks (block size is 8x8) within 16x16 matrix
-#    pragma unroll(16 / 2)
+#      pragma unroll(16 / 2)
   for (int i = 0; i < 16 / 2; ++i) {
     tmp[i] = _mm512_mask_permute4f128_ps(zmm[i], 0b1111111100000000,
                                          zmm[(16 / 2) + i], _MM_PERM_BACD);
@@ -380,7 +381,48 @@ transpose8x8_intrinsic(__m512d __restrict__ zmm[8]) {
   // zmm[6 ] = tmp[6 ];
   // zmm[7 ] = tmp[7 ];
 }
-#  endif // __MIC__
+#    endif // __MIC__
+#  endif
+#else // USE_INTEL_VECTOR_INTRINSICS
+#  if FPPREC == 0
+inline void transpose8x8_intrinsic(VECTOR __restrict__ x[8]) {
+    VECTOR t[8];
+
+    t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0], x[4][0], x[5][0], x[6][0], x[7][0]};
+    t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1], x[4][1], x[5][1], x[6][1], x[7][1]};
+    t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2], x[4][2], x[5][2], x[6][2], x[7][2]};
+    t[3] = (VECTOR){x[0][3], x[1][3], x[2][3], x[3][3], x[4][3], x[5][3], x[6][3], x[7][3]};
+    t[4] = (VECTOR){x[0][4], x[1][4], x[2][4], x[3][4], x[4][4], x[5][4], x[6][4], x[7][4]};
+    t[5] = (VECTOR){x[0][5], x[1][5], x[2][5], x[3][5], x[4][5], x[5][5], x[6][5], x[7][5]};
+    t[6] = (VECTOR){x[0][6], x[1][6], x[2][6], x[3][6], x[4][6], x[5][6], x[6][6], x[7][6]};
+    t[7] = (VECTOR){x[0][7], x[1][7], x[2][7], x[3][7], x[4][7], x[5][7], x[6][7], x[7][7]};
+
+    x[0] = t[0];
+    x[1] = t[1];
+    x[2] = t[2];
+    x[3] = t[3];
+    x[4] = t[4];
+    x[5] = t[5];
+    x[6] = t[6];
+    x[7] = t[7];
+}
+#  endif
+
+#  if FPPREC == 1
+inline void transpose4x4_intrinsic(VECTOR __restrict__ x[4]) {
+    VECTOR t[4];
+
+    t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0]};
+    t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1]};
+    t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2]};
+    t[3] = (VECTOR){x[0][3], x[1][3], x[2][3], x[3][3]};
+
+    x[0] = t[0];
+    x[1] = t[1];
+    x[2] = t[2];
+    x[3] = t[3];
+}
+#  endif
 #endif
 
 #endif // __TRANSPOSE_H

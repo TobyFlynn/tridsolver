@@ -720,7 +720,7 @@ inline void trid_z_cpu(FP* __restrict az, FP* __restrict bz, FP* __restrict cz, 
       SIMD_PACKSTORELO_P(&u2[ind],SIMD_ADD_P(u2[ind], dd));
     #else
       dd    = SIMD_SUB_P(d2[n], SIMD_MUL_P(c2[n],dd) );
-      SIMD_STORE_P((FP*)&u2[ind], SIMD_ADD_P(u2[ind], dd));
+      SIMD_STORE_P(&u2[ind], SIMD_ADD_P(u2[ind], dd));
     #endif
 
     //u2[ind] = SIMD_ADD_P(u2[ind], dd);

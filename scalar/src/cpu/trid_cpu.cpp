@@ -315,7 +315,7 @@ void trid_scalar_vec(const REAL *__restrict h_a, const REAL *__restrict h_b,
   VECTOR *__restrict d = (VECTOR *)h_d;
   VECTOR *__restrict u = (VECTOR *)h_u;
 
-  VECTOR ones(1.0f);
+  VECTOR SIMD_CONSTRUCTOR(ones, 1.0f);
 
   //
   // forward pass
