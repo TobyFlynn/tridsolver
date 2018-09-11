@@ -385,39 +385,39 @@ transpose8x8_intrinsic(__m512d __restrict__ zmm[8]) {
 #  endif
 #else // USE_INTEL_VECTOR_INTRINSICS
 #  if FPPREC == 0
-inline void transpose8x8_intrinsic(VECTOR __restrict__ x[8]) {
-#if 0
+inline void transpose8x8_intrinsic(VECTOR /*__restrict__*/ x[8]) {
+#ifdef __clang__
     // vectorised transpose:
     VECTOR s[8], t[8];
 
-    s[0] = __builtin_shuffle(x[0], x[1], (v8si){0,8,2,10, 4,12,6,14});
-    s[1] = __builtin_shuffle(x[0], x[1], (v8si){1,9,3,11, 5,13,7,15});
-    s[2] = __builtin_shuffle(x[2], x[3], (v8si){0,8,2,10, 4,12,6,14});
-    s[3] = __builtin_shuffle(x[2], x[3], (v8si){1,9,3,11, 5,13,7,15});
-    s[4] = __builtin_shuffle(x[4], x[5], (v8si){0,8,2,10, 4,12,6,14});
-    s[5] = __builtin_shuffle(x[4], x[5], (v8si){1,9,3,11, 5,13,7,15});
-    s[6] = __builtin_shuffle(x[6], x[7], (v8si){0,8,2,10, 4,12,6,14});
-    s[7] = __builtin_shuffle(x[6], x[7], (v8si){1,9,3,11, 5,13,7,15});
+    s[0] = shufflevector8(x[0], x[1], 0,8,2,10, 4,12,6,14);
+    s[1] = shufflevector8(x[0], x[1], 1,9,3,11, 5,13,7,15);
+    s[2] = shufflevector8(x[2], x[3], 0,8,2,10, 4,12,6,14);
+    s[3] = shufflevector8(x[2], x[3], 1,9,3,11, 5,13,7,15);
+    s[4] = shufflevector8(x[4], x[5], 0,8,2,10, 4,12,6,14);
+    s[5] = shufflevector8(x[4], x[5], 1,9,3,11, 5,13,7,15);
+    s[6] = shufflevector8(x[6], x[7], 0,8,2,10, 4,12,6,14);
+    s[7] = shufflevector8(x[6], x[7], 1,9,3,11, 5,13,7,15);
 
-    t[0] = __builtin_shuffle(s[0], s[2], (v8si){0,1,8,9, 4,5,12,13});
-    t[1] = __builtin_shuffle(s[1], s[3], (v8si){0,1,8,9, 4,5,12,13});
-    t[2] = __builtin_shuffle(s[0], s[2], (v8si){2,3,10,11, 6,7,14,15});
-    t[3] = __builtin_shuffle(s[1], s[3], (v8si){2,3,10,11, 6,7,14,15});
-    t[4] = __builtin_shuffle(s[4], s[6], (v8si){0,1,8,9, 4,5,12,13});
-    t[5] = __builtin_shuffle(s[5], s[6], (v8si){0,1,8,9, 4,5,12,13});
-    t[6] = __builtin_shuffle(s[4], s[6], (v8si){2,3,10,11, 6,7,14,15});
-    t[7] = __builtin_shuffle(s[5], s[7], (v8si){2,3,10,11, 6,7,14,15});
+    t[0] = shufflevector8(s[0], s[2], 0,1,8,9, 4,5,12,13);
+    t[1] = shufflevector8(s[1], s[3], 0,1,8,9, 4,5,12,13);
+    t[2] = shufflevector8(s[0], s[2], 2,3,10,11, 6,7,14,15);
+    t[3] = shufflevector8(s[1], s[3], 2,3,10,11, 6,7,14,15);
+    t[4] = shufflevector8(s[4], s[6], 0,1,8,9, 4,5,12,13);
+    t[5] = shufflevector8(s[5], s[6], 0,1,8,9, 4,5,12,13);
+    t[6] = shufflevector8(s[4], s[6], 2,3,10,11, 6,7,14,15);
+    t[7] = shufflevector8(s[5], s[7], 2,3,10,11, 6,7,14,15);
 
-    x[0] = __builtin_shuffle(t[0], t[4], (v8si){0,1,2,3, 8,9,10,11});
-    x[1] = __builtin_shuffle(t[1], t[5], (v8si){0,1,2,3, 8,9,10,11});
-    x[2] = __builtin_shuffle(t[2], t[6], (v8si){0,1,2,3, 8,9,10,11});
-    x[3] = __builtin_shuffle(t[3], t[7], (v8si){0,1,2,3, 8,9,10,11});
-    x[4] = __builtin_shuffle(t[0], t[4], (v8si){4,5,6,7, 12,13,14,15});
-    x[5] = __builtin_shuffle(t[1], t[5], (v8si){4,5,6,7, 12,13,14,15});
-    x[6] = __builtin_shuffle(t[2], t[6], (v8si){4,5,6,7, 12,13,14,15});
-    x[7] = __builtin_shuffle(t[3], t[7], (v8si){4,5,6,7, 12,13,14,15});
+    x[0] = shufflevector8(t[0], t[4], 0,1,2,3, 8,9,10,11);
+    x[1] = shufflevector8(t[1], t[5], 0,1,2,3, 8,9,10,11);
+    x[2] = shufflevector8(t[2], t[6], 0,1,2,3, 8,9,10,11);
+    x[3] = shufflevector8(t[3], t[7], 0,1,2,3, 8,9,10,11);
+    x[4] = shufflevector8(t[0], t[4], 4,5,6,7, 12,13,14,15);
+    x[5] = shufflevector8(t[1], t[5], 4,5,6,7, 12,13,14,15);
+    x[6] = shufflevector8(t[2], t[6], 4,5,6,7, 12,13,14,15);
+    x[7] = shufflevector8(t[3], t[7], 4,5,6,7, 12,13,14,15);
 #else
-    // Leave vectorisation to the compiler. Turns out it does a better job than we do manually.
+    // Leave vectorisation to the compiler. Turns out gcc does a better job than we do manually.
     VECTOR t[8];
 
     t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0], x[4][0], x[5][0], x[6][0], x[7][0]};
@@ -442,22 +442,22 @@ inline void transpose8x8_intrinsic(VECTOR __restrict__ x[8]) {
 #  endif
 
 #  if FPPREC == 1
-inline void transpose4x4_intrinsic(VECTOR __restrict__ x[4]) {
+inline void transpose4x4_intrinsic(VECTOR /*__restrict__*/ x[4]) {
     VECTOR t[4];
 
-#if 0
+#ifdef __clang__
     // vectorised transpose:
-    t[0] = __builtin_shuffle(x[0], x[1], (v4si){0,4,2,6});
-    t[1] = __builtin_shuffle(x[0], x[1], (v4si){1,5,3,7});
-    t[2] = __builtin_shuffle(x[2], x[3], (v4si){0,4,2,6});
-    t[3] = __builtin_shuffle(x[2], x[3], (v4si){1,5,3,7});
+    t[0] = shufflevector4(x[0], x[1], 0,4,2,6);
+    t[1] = shufflevector4(x[0], x[1], 1,5,3,7);
+    t[2] = shufflevector4(x[2], x[3], 0,4,2,6);
+    t[3] = shufflevector4(x[2], x[3], 1,5,3,7);
 
-    x[0] = __builtin_shuffle(t[0], t[2], (v4si){0,1,4,5});
-    x[1] = __builtin_shuffle(t[1], t[3], (v4si){0,1,4,5});
-    x[2] = __builtin_shuffle(t[0], t[2], (v4si){2,3,6,7});
-    x[3] = __builtin_shuffle(t[1], t[3], (v4si){2,3,6,7});
+    x[0] = shufflevector4(t[0], t[2], 0,1,4,5);
+    x[1] = shufflevector4(t[1], t[3], 0,1,4,5);
+    x[2] = shufflevector4(t[0], t[2], 2,3,6,7);
+    x[3] = shufflevector4(t[1], t[3], 2,3,6,7);
 #else
-    // Leave vectorisation to the compiler. Turns out it does a better job than we do manually.
+    // Leave vectorisation to the compiler. Turns out gcc does a better job than we do manually.
     t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0]};
     t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1]};
     t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2]};

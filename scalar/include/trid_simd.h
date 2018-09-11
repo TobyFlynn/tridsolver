@@ -180,6 +180,13 @@
 #  ifdef __GNUC__
 #    define __assume_aligned(var, align)
 #    define ASSUME_ALIGNED(align) __attribute__((assume_aligned(align)))
+#    ifdef __clang__
+#      define shufflevector4 __builtin_shufflevector
+#      define shufflevector8 __builtin_shufflevector
+#    else
+#      define shufflevector4(v1,v2,i1,i2,i3,i4)             __builtin_shuffle(v1,v2,(v4si){i1,i2,i3,i4})
+#      define shufflevector8(v1,v2,i1,i2,i3,i4,i5,i6,i7,i8) __builtin_shuffle(v1,v2,(v8si){i1,i2,i3,i4,i5,i6,i7,i8})
+#    endif
 #    if FPPREC == 0
 // float
        typedef float VECTOR __attribute__((vector_size(SIMD_WIDTH)));
@@ -204,7 +211,7 @@
 #    define SIMD_RCP_P(x)   ((VECTOR){SIMD_DUPLICATE(1.0F)}/(x))
 #    define SIMD_CONSTRUCTOR(type,val) type((VECTOR){SIMD_DUPLICATE(val)})
 #  else
-#    error "GCC vector extension only implemented for GCC"
+#    error "GCC vector extension only implemented for GCC and clang"
 #  endif
 #endif
 
