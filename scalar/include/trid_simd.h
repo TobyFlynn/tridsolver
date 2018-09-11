@@ -30,6 +30,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 // Written by Endre Laszlo, University of Oxford, endre.laszlo@oerc.ox.ac.uk,
 // 2013-2014
 
@@ -181,9 +183,13 @@
 #    if FPPREC == 0
 // float
        typedef float VECTOR __attribute__((vector_size(SIMD_WIDTH)));
+       typedef int32_t v4si __attribute__ ((vector_size (4*sizeof(int32_t))));
+       typedef int32_t v8si __attribute__ ((vector_size (8*sizeof(int32_t))));
 #    elif FPPREC == 1
 // double
        typedef double VECTOR __attribute__((vector_size(SIMD_WIDTH)));
+       typedef int64_t v4si __attribute__ ((vector_size (4*sizeof(int64_t))));
+       typedef int64_t v8si __attribute__ ((vector_size (8*sizeof(int64_t))));
 #    else
 #      error "Macro definition FPPREC unrecognized for GCC vector extension"
 #    endif

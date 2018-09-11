@@ -412,6 +412,19 @@ inline void transpose8x8_intrinsic(VECTOR __restrict__ x[8]) {
 inline void transpose4x4_intrinsic(VECTOR __restrict__ x[4]) {
     VECTOR t[4];
 
+#if 0
+    // vectorised transpose:
+    t[0] = __builtin_shuffle(x[0], x[1], (v4si){0,4,2,6});
+    t[1] = __builtin_shuffle(x[0], x[1], (v4si){1,5,3,7});
+    t[2] = __builtin_shuffle(x[2], x[3], (v4si){0,4,2,6});
+    t[3] = __builtin_shuffle(x[2], x[3], (v4si){1,5,3,7});
+
+    x[0] = __builtin_shuffle(t[0], t[2], (v4si){0,1,4,5});
+    x[1] = __builtin_shuffle(t[1], t[3], (v4si){0,1,4,5});
+    x[2] = __builtin_shuffle(t[0], t[2], (v4si){2,3,6,7});
+    x[3] = __builtin_shuffle(t[1], t[3], (v4si){2,3,6,7});
+#else
+    // Leave vectorisation to the compiler. Turns out it does a better job than we do manually.
     t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0]};
     t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1]};
     t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2]};
@@ -421,6 +434,7 @@ inline void transpose4x4_intrinsic(VECTOR __restrict__ x[4]) {
     x[1] = t[1];
     x[2] = t[2];
     x[3] = t[3];
+#endif
 }
 #  endif
 #endif
