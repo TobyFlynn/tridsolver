@@ -101,7 +101,7 @@ inline void store(FP *__restrict__ dst, SIMD_REG *__restrict__ src, int n,
       transpose8x8_intrinsic(reg);                                             \
       store(array, reg, n, N);
 #  endif
-#elif __AVX__
+#else
 #  if FPPREC == 0
 #    define LOAD(reg, array, n, N)                                             \
       load(reg, array, n, N);                                                  \
