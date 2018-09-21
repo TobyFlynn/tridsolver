@@ -41,11 +41,14 @@
 // Tridiagonal solver for multidimensional batch problems
 //
 template <typename REAL, typename VECTOR, int INC>
-__global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
+__device__ void trid_strided_multidim_kernel(const VECTOR* __restrict__ a,
                                       const VECTOR* __restrict__ b,
                                       const VECTOR* __restrict__ c,
                                       VECTOR* __restrict__ d,
                                       VECTOR* __restrict__ u, int ndim,
+                                      const int* __restrict__ d_dims,
+                                      const int* __restrict__ d_cumdims,
+                                      const int* __restrict__ d_cumpads,
                                       int solvedim, int sys_n) {
   int    j;
   VECTOR aa, bb, cc, dd, c2[N_MAX], d2[N_MAX];
@@ -54,6 +57,7 @@ __global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
   //
   int tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
   int coord[MAXDIM];
+
 
   #pragma loop unroll(MAXDIM)
   for(j=0; j<ndim; j++) {
@@ -75,6 +79,7 @@ __global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
 
   int stride   = d_cumpads[solvedim];
   int sys_size = d_dims[solvedim];
+
 
 //  Y-dim index setup
 //  int tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
@@ -132,5 +137,130 @@ __global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
     }
   }
 }
+
+
+template<typename REAL, typename VECTOR, int INC>
+__global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
+                                      const VECTOR* __restrict__ b,
+                                      const VECTOR* __restrict__ c,
+                                      VECTOR* __restrict__ d,
+                                      VECTOR* __restrict__ u, int ndim,
+                                      int solvedim, int sys_n,
+                                      const int dim0, const int pad0,
+                                      const int dim1 = 0, const int pad1 = 0,
+                                      const int dim2 = 0, const int pad2 = 0,
+                                      const int dim3 = 0, const int pad3 = 0,
+                                      const int dim4 = 0, const int pad4 = 0,
+                                      const int dim5 = 0, const int pad5 = 0,
+                                      const int dim6 = 0, const int pad6 = 0,
+                                      const int dim7 = 0, const int pad7 = 0
+                                      ) {
+
+   int tid = threadIdx.x + threadIdx.y*blockDim.x + threadIdx.z*blockDim.x*blockDim.y;
+
+   int __shared__ d_cumpads[MAXDIM + 1];
+   int __shared__ d_cumdims[MAXDIM + 1];
+   int __shared__ d_dims[MAXDIM];
+
+
+   if ( tid == 0 ) {
+      int pads[MAXDIM];
+      switch(ndim) {
+         case 8: d_dims[7] = dim7; pads[7] = pad7;
+         case 7: d_dims[6] = dim6; pads[6] = pad6;
+         case 6: d_dims[5] = dim5; pads[5] = pad5;
+         case 5: d_dims[4] = dim4; pads[4] = pad4;
+         case 4: d_dims[3] = dim3; pads[3] = pad3;
+         case 3: d_dims[2] = dim2; pads[2] = pad2;
+         case 2: d_dims[1] = dim1; pads[1] = pad1;
+         case 1: d_dims[0] = dim0; pads[0] = pad0;
+      }
+
+
+      d_cumdims[0] = d_cumpads[0] = 1;
+      for ( int i = 0 ; i < ndim ; i++ ) {
+         d_cumdims[i+1] = d_cumdims[i] * d_dims[i];
+         d_cumpads[i+1] = d_cumpads[i] * pads[i];
+      }
+
+   }
+   __syncthreads();
+
+   trid_strided_multidim_kernel<REAL, VECTOR, INC>(a, b, c, d, u, ndim, d_dims, d_cumdims, d_cumpads, solvedim, sys_n);
+}
+
+
+/* Rumor has it that the GPU kernels can take along about 256 bytes of arguments
+ * If we assume that includes a Program Counter pointer, that means that we have:
+ * 8 bytes PC
+ * 5*8 bytes (a, b, c, d, u)
+ * 4 bytes (ndim)
+ * 4 bytes (solvedim)
+ * 4 bytes (sys_n)
+ * ===
+ * 60 bytes
+ *
+ * That leaves ~196B.
+ *
+ * We need to pass 8 bytes per supported dimension (4 dim, 4 pad)
+ * For a MAXDIM of 8, that is 64 bytes, well within the range.
+ * 
+ * So, our API:
+ * __host__ launchSolve(a,b,c,d,u, ndim, int*dims, int*pads, solvedim, sys_n)
+ */
+#if MAXDIM > 8
+#error "Code needs updated to support DIMS > 8... Verify GPU can handle it"
+#endif
+
+template<typename REAL, typename VECTOR, int INC>
+void trid_strided_multidim(const dim3 &grid, const dim3 & block,
+                           const VECTOR* __restrict__ a,
+                           const VECTOR* __restrict__ b,
+                           const VECTOR* __restrict__ c,
+                           VECTOR* __restrict__ d,
+                           VECTOR* __restrict__ u, int ndim,
+                           int solvedim, int sys_n,
+                           const int* __restrict__ dims,
+                           const int* __restrict__ pads) {
+   switch (ndim) {
+   case 1:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0]);
+      break;
+   case 2:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1]);
+      break;
+   case 3:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2]);
+      break;
+   case 4:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3]);
+      break;
+   case 5:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
+         dims[4], pads[4]);
+      break;
+   case 6:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
+         dims[4], pads[4], dims[5], pads[5]);
+      break;
+   case 7:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
+         dims[4], pads[4], dims[5], pads[5], dims[6], pads[6]);
+      break;
+   case 8:
+      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
+         dims[4], pads[4], dims[5], pads[5], dims[6], pads[6], dims[7], pads[7]);
+      break;
+   }
+}
+
 
 #endif
