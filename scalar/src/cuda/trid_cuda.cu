@@ -62,6 +62,8 @@
 
 #include "cutil_inline.h"
 #include <cusparse_v2.h>
+#include <cublas_v2.h>
+#include <cuda_runtime_api.h>
 
 // cusparseHandle_t handle_sp; // Handle for cuSPARSE setup
 
@@ -169,6 +171,23 @@ void trid_linearlayout_cuda(const REAL **d_ax, const REAL **d_bx,
 // Host function for selecting the proper setup for solve in a specific
 // dimension
 //
+
+template<typename REAL>
+void transpose(cublasHandle_t &handle, size_t mRows, size_t nCols, const REAL *in, REAL *out) {
+}
+template<>
+void transpose<float>(cublasHandle_t &handle, size_t mRows, size_t nCols, const float *in, float *out) {
+   float alpha = 1.;
+   float beta = 0.;
+   cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, mRows, nCols, &alpha, in, nCols, &beta, in, nCols, out, mRows);
+}
+template<>
+void transpose<double>(cublasHandle_t &handle, size_t mRows, size_t nCols, const double *in, double *out) {
+   double alpha = 1.;
+   double beta = 0.;
+   cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, mRows, nCols, &alpha, in, nCols, &beta, in, nCols, out, mRows);
+}
+
 template <typename REAL, int INC>
 void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
                             REAL *d_d, REAL *d_u, int ndim, int solvedim,
@@ -185,13 +204,64 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
     
     // int sys_stride = 1;       // Stride between the consecutive elements of a
     // system
-    int sys_size = dims[0]; // Size (length) of a system
     int sys_pads = pads[0]; // Padded sizes along each ndim number of dimensions
     int sys_n_lin =
         dims[1] * dims[2]; // = cumdims[solve] // Number of systems to be solved
+#if 0
+    int sys_size = dims[0]; // Size (length) of a system
     int opt = opts[0];
     trid_linearlayout_cuda<REAL, INC>(&d_a, &d_b, &d_c, &d_d, &d_u, sys_size,
                                     sys_pads, sys_n_lin, opt);
+#else
+    static REAL *aT = NULL;
+    static REAL *bT = NULL;
+    static REAL *cT = NULL;
+    static REAL *dT = NULL;
+    static REAL *uT = NULL;
+    static int alloc_size = 0;
+
+    static cublasHandle_t handle = 0;
+
+    if ( !handle ) cublasCreate(&handle);
+
+    int size_needed = sizeof(REAL)*sys_pads*sys_n_lin;
+
+    if ( size_needed > alloc_size ) {
+#if 0
+       if ( alloc_size == 0 ) {
+          cudaFuncSetCacheConfig(transpose_readWrite_alignment_kernel<double, double, 1, false, 6, 4, 4>, cudaFuncCachePreferShared);
+       }
+#endif
+       if ( aT ) cudaFree( aT ); cudaMalloc(&aT, size_needed);
+       if ( bT ) cudaFree( bT ); cudaMalloc(&bT, size_needed);
+       if ( cT ) cudaFree( cT ); cudaMalloc(&cT, size_needed);
+       if ( dT ) cudaFree( dT ); cudaMalloc(&dT, size_needed);
+       if ( INC ) { if ( uT ) cudaFree( uT ); cudaMalloc(&uT, size_needed); }
+
+       alloc_size = size_needed;
+    }
+
+    size_t m = sys_n_lin;  /* Maybe need to swap? */
+    size_t n = sys_pads;
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+    transpose(handle, m, n, d_a, aT);
+    transpose(handle, m, n, d_b, bT);
+    transpose(handle, m, n, d_c, cT);
+    transpose(handle, m, n, d_d, dT);
+    if ( INC) transpose(handle, m, n, d_u, uT);
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
+    assert(ndim <= 3);
+    int newDims[MAXDIM] = {dims[1]*dims[2], dims[0]};
+    int newPads[MAXDIM] = {pads[1], pads[0]};
+    tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, ndim-1, 1, newDims, newPads, opts, sync);
+
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+    if ( INC ) transpose(handle, n, m, uT, d_u);
+    else transpose(handle, n, m, dT, d_d);
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
+#endif
   } else {
     if (solvedim == 1 && opts[1] == 3) { // If y-solve and ThomasPCR
      
