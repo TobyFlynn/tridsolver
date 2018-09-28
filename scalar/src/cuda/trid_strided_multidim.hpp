@@ -45,74 +45,18 @@ __device__ void trid_strided_multidim_kernel(const VECTOR* __restrict__ a,
                                       const VECTOR* __restrict__ b,
                                       const VECTOR* __restrict__ c,
                                       VECTOR* __restrict__ d,
-                                      VECTOR* __restrict__ u, int ndim,
-                                      const int* __restrict__ d_dims,
-                                      const int* __restrict__ d_cumdims,
-                                      const int* __restrict__ d_cumpads,
-                                      int solvedim, int sys_n) {
-  int    j;
-  VECTOR aa, bb, cc, dd, c2[N_MAX], d2[N_MAX];
-  //
-  // set up indices for main block
-  //
-  int tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
-  int coord[MAXDIM];
-
-
-  #pragma loop unroll(MAXDIM)
-  for(j=0; j<ndim; j++) {
-    if(j<=solvedim) coord[j] = ( tid /  d_cumdims[j] ) % d_dims[j];
-    else            coord[j] = ( tid / (d_cumdims[j] / d_dims[solvedim])) % d_dims[j];
-//    if(tid==256) {
-//      printf("tid           = %d \n",tid);
-//      printf("d_cumdims[%d] = %d \n",j,d_cumdims[j]);
-//      printf("d_dims[%d]    = %d \n",j,d_dims[j]);
-//      printf("coord[%d] = %d \n",j,coord[j]);
-//      printf("d_cumpads[%d] = %d \n\n",j,d_cumpads[j]);
-//    }
-  }
-  coord[solvedim] = 0;
-
-  int ind = 0;
-  #pragma loop unroll(MAXDIM)
-  for(j=0; j<ndim; j++) ind += coord[j]*d_cumpads[j];
-
-  int stride   = d_cumpads[solvedim];
-  int sys_size = d_dims[solvedim];
-
-
-//  Y-dim index setup
-//  int tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
-//  int stride   = d_pads[0];
-//  int sys_size = d_dims[1];
-//  int sys_n    = d_dims[0]*d_dims[2];
-//  int coord[3];
-//  coord[0] =( tid % d_dims[0]);
-//  coord[1] = 0;
-//  coord[2] = (tid / d_dims[0] ) % d_dims[1];
-//  int ind = coord[0] + coord[1]*d_pads[0] + coord[2]*d_pads[0]*d_pads[1];
-
-//  //  Z-dim index setup
-//  int tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
-//  int stride   = d_pads[0]*d_pads[1];
-//  int sys_size = d_dims[2];
-//  int sys_n    = d_dims[0]*d_dims[1];
-//  int coord[3];
-//  coord[0] = tid % d_dims[0];
-//  coord[1] = (tid / d_dims[0] ) % d_dims[1];
-//  coord[2] = 0;
-//  int ind = coord[0] + coord[1]*d_pads[0] + coord[2]*d_pads[0]*d_pads[1];
-
-  if( tid<sys_n ) {
-    //
-    // forward pass
-    //
-    bb    = (static_cast<REAL>(1.0))  / b[ind];
-    cc    = bb*c[ind];
-    dd    = bb*d[ind];
-    c2[0] = cc;
-    d2[0] = dd;
-    for(j=1; j<sys_size; j++) {
+                                      VECTOR* __restrict__ u,
+                                      int ind, int stride, int sys_size) {
+   VECTOR aa, bb, cc, dd, c2[N_MAX], d2[N_MAX];
+   //
+   // forward pass
+   //
+   bb    = (static_cast<REAL>(1.0))  / b[ind];
+   cc    = bb*c[ind];
+   dd    = bb*d[ind];
+   c2[0] = cc;
+   d2[0] = dd;
+   for(int j=1; j<sys_size; j++) {
       ind   = ind + stride;
       aa    = a[ind];
       bb    = b[ind] - aa*cc;
@@ -122,71 +66,73 @@ __device__ void trid_strided_multidim_kernel(const VECTOR* __restrict__ a,
       dd    = bb*dd;
       c2[j] = cc;
       d2[j] = dd;
-    }
-    //
-    // reverse pass
-    //
-    if(INC==0) d[ind]  = dd;
-    else       u[ind] += dd;
-    //u[ind] = dd;
-    for(j=sys_size-2; j>=0; j--) {
+   }
+   //
+   // reverse pass
+   //
+   if(INC==0) d[ind]  = dd;
+   else       u[ind] += dd;
+   //u[ind] = dd;
+   for(int j=sys_size-2; j>=0; j--) {
       ind    = ind - stride;
       dd     = d2[j] - c2[j]*dd;
       if(INC==0) d[ind]  = dd;
       else       u[ind] += dd;
-    }
-  }
+   }
 }
+
+struct int8 {
+   int v[MAXDIM];
+};
 
 
 template<typename REAL, typename VECTOR, int INC>
 __global__ void trid_strided_multidim(const VECTOR* __restrict__ a,
-                                      const VECTOR* __restrict__ b,
-                                      const VECTOR* __restrict__ c,
-                                      VECTOR* __restrict__ d,
-                                      VECTOR* __restrict__ u, int ndim,
-                                      int solvedim, int sys_n,
-                                      const int dim0, const int pad0,
-                                      const int dim1 = 0, const int pad1 = 0,
-                                      const int dim2 = 0, const int pad2 = 0,
-                                      const int dim3 = 0, const int pad3 = 0,
-                                      const int dim4 = 0, const int pad4 = 0,
-                                      const int dim5 = 0, const int pad5 = 0,
-                                      const int dim6 = 0, const int pad6 = 0,
-                                      const int dim7 = 0, const int pad7 = 0
-                                      ) {
+      const VECTOR* __restrict__ b,
+      const VECTOR* __restrict__ c,
+      VECTOR* __restrict__ d,
+      VECTOR* __restrict__ u, int ndim,
+      int solvedim, int sys_n,
+      const int8 dims, const int8 pads
+      ) {
 
    int tid = threadIdx.x + threadIdx.y*blockDim.x + threadIdx.z*blockDim.x*blockDim.y;
+   if ( solvedim < 1 || solvedim > ndim ) return; /* Just hints to the compiler */
 
    int __shared__ d_cumpads[MAXDIM + 1];
    int __shared__ d_cumdims[MAXDIM + 1];
-   int __shared__ d_dims[MAXDIM];
 
 
    if ( tid == 0 ) {
-      int pads[MAXDIM];
-      switch(ndim) {
-         case 8: d_dims[7] = dim7; pads[7] = pad7;
-         case 7: d_dims[6] = dim6; pads[6] = pad6;
-         case 6: d_dims[5] = dim5; pads[5] = pad5;
-         case 5: d_dims[4] = dim4; pads[4] = pad4;
-         case 4: d_dims[3] = dim3; pads[3] = pad3;
-         case 3: d_dims[2] = dim2; pads[2] = pad2;
-         case 2: d_dims[1] = dim1; pads[1] = pad1;
-         case 1: d_dims[0] = dim0; pads[0] = pad0;
-      }
-
 
       d_cumdims[0] = d_cumpads[0] = 1;
       for ( int i = 0 ; i < ndim ; i++ ) {
-         d_cumdims[i+1] = d_cumdims[i] * d_dims[i];
-         d_cumpads[i+1] = d_cumpads[i] * pads[i];
+         d_cumdims[i+1] = d_cumdims[i] * dims.v[i];
+         d_cumpads[i+1] = d_cumpads[i] * pads.v[i];
       }
 
    }
    __syncthreads();
 
-   trid_strided_multidim_kernel<REAL, VECTOR, INC>(a, b, c, d, u, ndim, d_dims, d_cumdims, d_cumpads, solvedim, sys_n);
+   //
+   // set up indices for main block
+   //
+   tid = threadIdx.x + threadIdx.y*blockDim.x + blockIdx.x*blockDim.y*blockDim.x + blockIdx.y*gridDim.x*blockDim.y*blockDim.x; // Thread ID in global scope - every thread solves one system
+   
+   int ind = 0;
+
+   for ( int j = 0; j < solvedim; j++)
+      ind += (( tid /  d_cumdims[j] ) % dims.v[j]) * d_cumpads[j];
+   for ( int j = solvedim+1; j < ndim; j++)
+      ind += (( tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) * d_cumpads[j];
+
+
+   int stride   = d_cumpads[solvedim];
+   int sys_size = dims.v[solvedim];
+
+   if( tid<sys_n ) {
+      trid_strided_multidim_kernel<REAL, VECTOR, INC>(a, b, c, d, u, ind, stride, sys_size);
+   }
 }
 
 
@@ -222,44 +168,13 @@ void trid_strided_multidim(const dim3 &grid, const dim3 & block,
                            int solvedim, int sys_n,
                            const int* __restrict__ dims,
                            const int* __restrict__ pads) {
-   switch (ndim) {
-   case 1:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0]);
-      break;
-   case 2:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1]);
-      break;
-   case 3:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2]);
-      break;
-   case 4:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3]);
-      break;
-   case 5:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
-         dims[4], pads[4]);
-      break;
-   case 6:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
-         dims[4], pads[4], dims[5], pads[5]);
-      break;
-   case 7:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
-         dims[4], pads[4], dims[5], pads[5], dims[6], pads[6]);
-      break;
-   case 8:
-      trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
-         dims[0], pads[0], dims[1], pads[1], dims[2], pads[2], dims[3], pads[3],
-         dims[4], pads[4], dims[5], pads[5], dims[6], pads[6], dims[7], pads[7]);
-      break;
-   }
+
+   int8 a_dims, a_pads;
+   memcpy(&a_dims.v, dims, ndim*sizeof(int));
+   memcpy(&a_pads.v, pads, ndim*sizeof(int));
+
+   trid_strided_multidim<REAL, VECTOR, INC><<<grid, block>>>(a, b, c, d, u, ndim, solvedim, sys_n,
+         a_dims, a_pads);
 }
 
 
