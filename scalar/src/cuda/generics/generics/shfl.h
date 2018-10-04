@@ -8,7 +8,7 @@ template<int s>
 struct shuffle {
     __device__ __forceinline__
     static void impl(array<int, s>& d, const int& i) {
-        d.head = __shfl(d.head, i);
+        d.head = __shfl_sync(0xffffffff, d.head, i);
         shuffle<s-1>::impl(d.tail, i);
     }
 };
@@ -17,7 +17,7 @@ template<>
 struct shuffle<1> {
     __device__ __forceinline__
     static void impl(array<int, 1>& d, const int& i) {
-        d.head = __shfl(d.head, i);
+        d.head = __shfl_sync(0xffffffff, d.head, i);
     }
 };
 
