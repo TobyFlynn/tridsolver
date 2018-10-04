@@ -71,6 +71,9 @@ __constant__ int
 
 // cusparseHandle_t handle_sp; // Handle for cuSPARSE setup
 
+
+    //TODO: THIS IS NOT THEAD SAFE!!
+    // Remove this, it has to come in through the argument list
 int opts[MAXDIM];
 
 int cumdims[MAXDIM + 1]; // Cummulative-multiplication of dimensions
@@ -438,6 +441,7 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
 //  return TRID_STATUS_SUCCESS;
 //}
 
+
 tridStatus_t tridSmtsvStridedBatch(const float *a, const float *b,
                                    const float *c, float *d, float *u, int ndim,
                                    int solvedim, int *dims, int *pads,
@@ -446,6 +450,7 @@ tridStatus_t tridSmtsvStridedBatch(const float *a, const float *b,
                                    opts, 1);
   return TRID_STATUS_SUCCESS;
 }
+
 
 tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
                                    const double *c, double *d, double *u,
@@ -472,6 +477,7 @@ tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
 //  return TRID_STATUS_SUCCESS;
 //}
 
+
 tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b,
                                       const float *c, float *d, float *u,
                                       int ndim, int solvedim, int *dims,
@@ -480,6 +486,7 @@ tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b,
                                    opts, 1);
   return TRID_STATUS_SUCCESS;
 }
+
 
 tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
                                       const double *c, double *d, double *u,
@@ -505,5 +512,6 @@ tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
 //  sys_stride, opts, NULL, 1, 1);
 //  return TRID_STATUS_SUCCESS;
 //}
+
 
 int *get_opts() { return opts; }

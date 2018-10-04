@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 2.8.8)
 
-option(INTEL_CC "Use the Intel compiler." ON) 
-option(INTEL_VECTOR_INTRINSICS "Use Intel vector intrinsics." OFF)
-option(BUILD_FOR_CPU "Build library for CPU architecture." OFF)
+option(INTEL_CC "Use the Intel compiler." OFF) 
+#option(INTEL_VECTOR_INTRINSICS "Use Intel vector intrinsics." OFF)
+option(BUILD_FOR_CPU "Build library for CPU architecture." ON)
 option(BUILD_FOR_MIC "Build library for MIC architecture." OFF) 
-option(BUILD_FOR_GPU "Build library for GPU architecture." OFF) 
+option(BUILD_FOR_GPU "Build library for GPU architecture." ON) 
 
 if (INTEL_CC) 
   # Detect/find Intel compilers
@@ -30,7 +30,7 @@ project("libtrid")
 if (INTEL_CC) 
   # Set compiler flags/options for Intel compiler
   #set(FLAGS_INTEL_DEFAULT "-xCORE_AVX2 -parallel -qopenmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par -opt-report-phase=offload")
-  set(FLAGS_INTEL_DEFAULT "-xHost -m64 -parallel -qopenmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par") #-xCORE_AVX2 
+   set(FLAGS_INTEL_DEFAULT "-xHost -m64 -parallel -DUSE_INTEL_VECTOR_INTRINSICS -qopenmp -no-offload -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par") #-xCORE_AVX2 
 
 	set(FLAGS_INTEL_DEBUG   "-g -O0")
 	set(FLAGS_INTEL_RELEASE "-O3 -ip -restrict") #-fp-model fast 
@@ -57,9 +57,9 @@ else (INTEL_CC)
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_RELEASE}     ${FLAGS_GCC_RELEASE} -std=c99") 
 endif (INTEL_CC)
 
-if (INTEL_VECTOR_INTRINSICS)
-  set(FLAGS_GCC_DEFAULT "${FLAGS_GCC_DEFAULT -DUSE_INTEL_VECTOR_INTRINSICS}")
-endif (INTEL_VECTOR_INTRINSICS)
+#if (INTEL_VECTOR_INTRINSICS)
+#set(FLAGS_GCC_DEFAULT "${FLAGS_GCC_DEFAULT -DUSE_INTEL_VECTOR_INTRINSICS}")
+#endif (INTEL_VECTOR_INTRINSICS)
 
 # Define maximal length of a scalar tridiagonal system 
 set(N_MAX 1024 CACHE STRING "Maximal length of the internal buffer for storing intermediate c and d vectors of the Thomas algorithm") 
