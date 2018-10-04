@@ -38,7 +38,8 @@
 
 #include "trid_simd.h"
 
-#ifdef __AVX__
+#ifdef USE_INTEL_VECTOR_INTRINSICS
+#  ifdef __AVX__
 // void transpose8x8_intrinsic(__m256 *ymm ) {
 inline void transpose8x8_intrinsic(__m256 __restrict__ ymm[8]) {
   __m256 tmp[8];
@@ -94,8 +95,8 @@ inline void transpose4x4_intrinsic(__m256d __restrict__ ymm[4]) {
   ymm[3] = _mm256_shuffle_pd(tmp[2], tmp[3], 0b00001111);
 }
 
-#else
-#  ifdef __MIC__
+#  else
+#    ifdef __MIC__
 __attribute__((target(mic)))
 // void transpose16x16_intrinsic( __m512 *zmm ) {
 inline void
@@ -103,7 +104,7 @@ transpose16x16_intrinsic(__m512 __restrict__ zmm[16]) {
   __m512 tmp[16];
 
 // Transpose 2x2 blocks (block size is 8x8) within 16x16 matrix
-#    pragma unroll(16 / 2)
+#      pragma unroll(16 / 2)
   for (int i = 0; i < 16 / 2; ++i) {
     tmp[i] = _mm512_mask_permute4f128_ps(zmm[i], 0b1111111100000000,
                                          zmm[(16 / 2) + i], _MM_PERM_BACD);
@@ -380,7 +381,95 @@ transpose8x8_intrinsic(__m512d __restrict__ zmm[8]) {
   // zmm[6 ] = tmp[6 ];
   // zmm[7 ] = tmp[7 ];
 }
-#  endif // __MIC__
+#    endif // __MIC__
+#  endif
+#else // USE_INTEL_VECTOR_INTRINSICS
+#  if FPPREC == 0
+inline void transpose8x8_intrinsic(VECTOR /*__restrict__*/ x[8]) {
+#ifdef __clang__
+    // vectorised transpose:
+    VECTOR s[8], t[8];
+
+    s[0] = shufflevector8(x[0], x[1], 0,8,2,10, 4,12,6,14);
+    s[1] = shufflevector8(x[0], x[1], 1,9,3,11, 5,13,7,15);
+    s[2] = shufflevector8(x[2], x[3], 0,8,2,10, 4,12,6,14);
+    s[3] = shufflevector8(x[2], x[3], 1,9,3,11, 5,13,7,15);
+    s[4] = shufflevector8(x[4], x[5], 0,8,2,10, 4,12,6,14);
+    s[5] = shufflevector8(x[4], x[5], 1,9,3,11, 5,13,7,15);
+    s[6] = shufflevector8(x[6], x[7], 0,8,2,10, 4,12,6,14);
+    s[7] = shufflevector8(x[6], x[7], 1,9,3,11, 5,13,7,15);
+
+    t[0] = shufflevector8(s[0], s[2], 0,1,8,9, 4,5,12,13);
+    t[1] = shufflevector8(s[1], s[3], 0,1,8,9, 4,5,12,13);
+    t[2] = shufflevector8(s[0], s[2], 2,3,10,11, 6,7,14,15);
+    t[3] = shufflevector8(s[1], s[3], 2,3,10,11, 6,7,14,15);
+    t[4] = shufflevector8(s[4], s[6], 0,1,8,9, 4,5,12,13);
+    t[5] = shufflevector8(s[5], s[6], 0,1,8,9, 4,5,12,13);
+    t[6] = shufflevector8(s[4], s[6], 2,3,10,11, 6,7,14,15);
+    t[7] = shufflevector8(s[5], s[7], 2,3,10,11, 6,7,14,15);
+
+    x[0] = shufflevector8(t[0], t[4], 0,1,2,3, 8,9,10,11);
+    x[1] = shufflevector8(t[1], t[5], 0,1,2,3, 8,9,10,11);
+    x[2] = shufflevector8(t[2], t[6], 0,1,2,3, 8,9,10,11);
+    x[3] = shufflevector8(t[3], t[7], 0,1,2,3, 8,9,10,11);
+    x[4] = shufflevector8(t[0], t[4], 4,5,6,7, 12,13,14,15);
+    x[5] = shufflevector8(t[1], t[5], 4,5,6,7, 12,13,14,15);
+    x[6] = shufflevector8(t[2], t[6], 4,5,6,7, 12,13,14,15);
+    x[7] = shufflevector8(t[3], t[7], 4,5,6,7, 12,13,14,15);
+#else
+    // Leave vectorisation to the compiler. Turns out gcc does a better job than we do manually.
+    VECTOR t[8];
+
+    t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0], x[4][0], x[5][0], x[6][0], x[7][0]};
+    t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1], x[4][1], x[5][1], x[6][1], x[7][1]};
+    t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2], x[4][2], x[5][2], x[6][2], x[7][2]};
+    t[3] = (VECTOR){x[0][3], x[1][3], x[2][3], x[3][3], x[4][3], x[5][3], x[6][3], x[7][3]};
+    t[4] = (VECTOR){x[0][4], x[1][4], x[2][4], x[3][4], x[4][4], x[5][4], x[6][4], x[7][4]};
+    t[5] = (VECTOR){x[0][5], x[1][5], x[2][5], x[3][5], x[4][5], x[5][5], x[6][5], x[7][5]};
+    t[6] = (VECTOR){x[0][6], x[1][6], x[2][6], x[3][6], x[4][6], x[5][6], x[6][6], x[7][6]};
+    t[7] = (VECTOR){x[0][7], x[1][7], x[2][7], x[3][7], x[4][7], x[5][7], x[6][7], x[7][7]};
+
+    x[0] = t[0];
+    x[1] = t[1];
+    x[2] = t[2];
+    x[3] = t[3];
+    x[4] = t[4];
+    x[5] = t[5];
+    x[6] = t[6];
+    x[7] = t[7];
+#endif
+}
+#  endif
+
+#  if FPPREC == 1
+inline void transpose4x4_intrinsic(VECTOR /*__restrict__*/ x[4]) {
+    VECTOR t[4];
+
+#ifdef __clang__
+    // vectorised transpose:
+    t[0] = shufflevector4(x[0], x[1], 0,4,2,6);
+    t[1] = shufflevector4(x[0], x[1], 1,5,3,7);
+    t[2] = shufflevector4(x[2], x[3], 0,4,2,6);
+    t[3] = shufflevector4(x[2], x[3], 1,5,3,7);
+
+    x[0] = shufflevector4(t[0], t[2], 0,1,4,5);
+    x[1] = shufflevector4(t[1], t[3], 0,1,4,5);
+    x[2] = shufflevector4(t[0], t[2], 2,3,6,7);
+    x[3] = shufflevector4(t[1], t[3], 2,3,6,7);
+#else
+    // Leave vectorisation to the compiler. Turns out gcc does a better job than we do manually.
+    t[0] = (VECTOR){x[0][0], x[1][0], x[2][0], x[3][0]};
+    t[1] = (VECTOR){x[0][1], x[1][1], x[2][1], x[3][1]};
+    t[2] = (VECTOR){x[0][2], x[1][2], x[2][2], x[3][2]};
+    t[3] = (VECTOR){x[0][3], x[1][3], x[2][3], x[3][3]};
+
+    x[0] = t[0];
+    x[1] = t[1];
+    x[2] = t[2];
+    x[3] = t[3];
+#endif
+}
+#  endif
 #endif
 
 #endif // __TRANSPOSE_H

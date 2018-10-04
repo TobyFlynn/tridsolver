@@ -101,7 +101,7 @@ inline void store(FP *__restrict__ dst, SIMD_REG *__restrict__ src, int n,
       transpose8x8_intrinsic(reg);                                             \
       store(array, reg, n, N);
 #  endif
-#elif __AVX__
+#else
 #  if FPPREC == 0
 #    define LOAD(reg, array, n, N)                                             \
       load(reg, array, n, N);                                                  \
@@ -315,7 +315,7 @@ void trid_scalar_vec(const REAL *__restrict h_a, const REAL *__restrict h_b,
   VECTOR *__restrict d = (VECTOR *)h_d;
   VECTOR *__restrict u = (VECTOR *)h_u;
 
-  VECTOR ones(1.0f);
+  VECTOR SIMD_CONSTRUCTOR(ones, 1.0f);
 
   //
   // forward pass
@@ -532,12 +532,14 @@ void tridMultiDimBatchSolve(const FP *a, const FP *b, const FP *c, FP *d, FP *u,
 
 #if FPPREC == 0
 
+
 tridStatus_t tridSmtsvStridedBatch(const float *a, const float *b,
                                    const float *c, float *d, float *u, int ndim,
                                    int solvedim, int *dims, int *pads) {
   tridMultiDimBatchSolve(a, b, c, d, NULL, ndim, solvedim, dims, pads, 0);
   return TRID_STATUS_SUCCESS;
 }
+
 
 tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b,
                                       const float *c, float *d, float *u,
@@ -547,11 +549,13 @@ tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b,
   return TRID_STATUS_SUCCESS;
 }
 
+
 void trid_scalarS(float *__restrict a, float *__restrict b, float *__restrict c,
                   float *__restrict d, float *__restrict u, int N, int stride) {
 
   trid_scalar<0>(a, b, c, d, u, N, stride);
 }
+
 
 void trid_x_transposeS(float *__restrict a, float *__restrict b,
                        float *__restrict c, float *__restrict d,
@@ -561,12 +565,14 @@ void trid_x_transposeS(float *__restrict a, float *__restrict b,
   trid_x_transpose<0>(a, b, c, d, u, sys_size, sys_pad, stride);
 }
 
+
 void trid_scalar_vecS(const float *__restrict a, const float *__restrict b,
                       const float *__restrict c, float *__restrict d,
                       float *__restrict u, int N, int stride) {
 
   trid_scalar_vec<FP, VECTOR, 0>(a, b, c, d, u, N, stride);
 }
+
 
 void trid_scalar_vecSInc(float *__restrict a, float *__restrict b,
                          float *__restrict c, float *__restrict d,
@@ -577,6 +583,7 @@ void trid_scalar_vecSInc(float *__restrict a, float *__restrict b,
 
 #elif FPPREC == 1
 
+
 tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
                                    const double *c, double *d, double *u,
                                    int ndim, int solvedim, int *dims,
@@ -584,6 +591,7 @@ tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
   tridMultiDimBatchSolve(a, b, c, d, NULL, ndim, solvedim, dims, pads, 0);
   return TRID_STATUS_SUCCESS;
 }
+
 
 tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
                                       const double *c, double *d, double *u,
@@ -593,12 +601,14 @@ tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
   return TRID_STATUS_SUCCESS;
 }
 
+
 void trid_scalarD(double *__restrict a, double *__restrict b,
                   double *__restrict c, double *__restrict d,
                   double *__restrict u, int N, int stride) {
 
   trid_scalar<0>(a, b, c, d, u, N, stride);
 }
+
 
 void trid_x_transposeD(double *__restrict a, double *__restrict b,
                        double *__restrict c, double *__restrict d,
@@ -608,12 +618,14 @@ void trid_x_transposeD(double *__restrict a, double *__restrict b,
   trid_x_transpose<0>(a, b, c, d, u, sys_size, sys_pad, stride);
 }
 
+
 void trid_scalar_vecD(double *__restrict a, double *__restrict b,
                       double *__restrict c, double *__restrict d,
                       double *__restrict u, int N, int stride) {
 
   trid_scalar_vec<FP, VECTOR, 0>(a, b, c, d, u, N, stride);
 }
+
 
 void trid_scalar_vecDInc(double *__restrict a, double *__restrict b,
                          double *__restrict c, double *__restrict d,

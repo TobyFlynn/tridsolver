@@ -30,6 +30,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
+
 // Written by Endre Laszlo, University of Oxford, endre.laszlo@oerc.ox.ac.uk,
 // 2013-2014
 
@@ -73,99 +75,143 @@
 #      define SIMD_WIDTH (32) // Width of SIMD vector unit in bytes
 #      define SIMD_VEC                                                         \
         (SIMD_WIDTH / FBYTE) // Number of 4 byte floats in a SIMD vector unit
+#      define SIMD_DUPLICATE(x) x,x,x,x,x,x,x,x
 #    elif FPPREC == 1
 // AVX double
 #      define FBYTE 8
 #      define SIMD_WIDTH (32) // Width of SIMD vector unit in bytes
 #      define SIMD_VEC                                                         \
         (SIMD_WIDTH / FBYTE) // Number of 8 byte floats in a SIMD vector unit
+#      define SIMD_DUPLICATE(x) x,x,x,x
 #    endif
 #  endif
 #endif
 
-#ifdef __AVX__
-#  include "dvec.h"
-#  if FPPREC == 0
+#ifdef USE_INTEL_VECTOR_INTRINSICS
+#  define ASSUME_ALIGNED(align)
+#  define SIMD_CONSTRUCTOR(type,val) type(val)
+#  ifdef __AVX__
+#    include "dvec.h"
+#    if FPPREC == 0
 // AVX float
-#    define VECTOR F32vec8
-#    define SIMD_REG __m256            // Name of Packed REGister
-#    define SIMD_LOAD_P _mm256_load_ps // Aligned load for packed registers
-#    define SIMD_STREAM_P                                                      \
-      _mm256_stream_ps // Aligned stream store for packed registers
-#    define SIMD_STORE_P _mm256_store_ps // Aligned store for packed registers
-#    define SIMD_SET1_P _mm256_set1_ps   // Set Packed register
-#    define SIMD_ADD_P _mm256_add_ps
-#    define SIMD_SUB_P _mm256_sub_ps
-#    define SIMD_MUL_P _mm256_mul_ps
-#    define SIMD_DIV_P _mm256_div_ps
-#    define SIMD_RCP_P _mm256_rcp_ps
-#  elif FPPREC == 1
+#      define VECTOR F32vec8
+#      define SIMD_REG __m256            // Name of Packed REGister
+#      define SIMD_LOAD_P _mm256_load_ps // Aligned load for packed registers
+#      define SIMD_STREAM_P                                                      \
+        _mm256_stream_ps // Aligned stream store for packed registers
+#      define SIMD_STORE_P(ptr,x) _mm256_store_ps((FP*)(ptr), x) // Aligned store for packed registers
+#      define SIMD_SET1_P _mm256_set1_ps   // Set Packed register
+#      define SIMD_ADD_P _mm256_add_ps
+#      define SIMD_SUB_P _mm256_sub_ps
+#      define SIMD_MUL_P _mm256_mul_ps
+#      define SIMD_DIV_P _mm256_div_ps
+#      define SIMD_RCP_P _mm256_rcp_ps
+#    elif FPPREC == 1
 // AVX double
-#    define VECTOR F64vec4
-#    define SIMD_REG __m256d             // Name of Packed REGister
-#    define SIMD_LOAD_P _mm256_load_pd   // Aligned load for packed registers
-#    define SIMD_STORE_P _mm256_store_pd // Aligned store for packed registers
-#    define SIMD_SET1_P _mm256_set1_pd   // Set Packed register
-#    define SIMD_ADD_P _mm256_add_pd
-#    define SIMD_SUB_P _mm256_sub_pd
-#    define SIMD_MUL_P _mm256_mul_pd
-#    define SIMD_DIV_P _mm256_div_pd
+#      define VECTOR F64vec4
+#      define SIMD_REG __m256d             // Name of Packed REGister
+#      define SIMD_LOAD_P _mm256_load_pd   // Aligned load for packed registers
+#      define SIMD_STORE_P(ptr,x) _mm256_store_pd((FP*)(ptr), x) // Aligned store for packed registers
+#      define SIMD_SET1_P _mm256_set1_pd   // Set Packed register
+#      define SIMD_ADD_P _mm256_add_pd
+#      define SIMD_SUB_P _mm256_sub_pd
+#      define SIMD_MUL_P _mm256_mul_pd
+#      define SIMD_DIV_P _mm256_div_pd
+#    else
+#      error "Macro definition FPPREC unrecognized for AVX-based processor"
+#    endif
 #  else
-#    error "Macro definition FPPREC unrecognized for AVX-based processor"
+#    pragma offload_attribute(push, target(mic))
+#    ifdef __MIC__ // Or #ifdef __KNC__ - more general option, future proof,
+                   // __INTEL_OFFLOAD is another option
+#      include "mic/micvec.h"
+#      if FPPREC == 0
+// Xeon Phi float
+#        define VECTOR F32vec16
+#        define SIMD_REG __m512            // Name of Packed REGister
+#        define SIMD_REGI __m512i          // Name of Packed integer REGister
+#        define SIMD_LOAD_P _mm512_load_ps // Aligned load for packed registers
+#        define SIMD_PACKSTORELO_P _mm512_packstorelo_ps
+#        define SIMD_SET1_P _mm512_set1_ps
+#        define SIMD_SET_EPI _mm512_set_epi32
+#        define SIMD_SET1_EPI _mm512_set1_epi32
+#        define SIMD_I32GATHER_P _mm512_i32gather_ps
+#        define SIMD_I32SCATTER_P _mm512_i32scatter_ps
+#        define SIMD_ADD_P _mm512_add_ps
+#        define SIMD_FMADD_P _mm512_fmadd_ps
+#        define SIMD_FNMADD_P _mm512_fnmadd_ps
+#        define SIMD_ADD_EPI _mm512_add_epi32
+#        define SIMD_SUB_P _mm512_sub_ps
+#        define SIMD_SUB_EPI _mm512_sub_epi32
+#        define SIMD_MUL_P _mm512_mul_ps
+#        define SIMD_DIV_P _mm512_div_ps
+#        define SIMD_RCP_P _mm512_rcp23_ps
+#      elif FPPREC == 1
+// Xeon Phi double
+#        define VECTOR F64vec8
+#        define SIMD_REG __m512d           // Name of Packed REGister
+#        define SIMD_REGI __m512i          // Name of Packed integer REGister
+#        define SIMD_LOAD_P _mm512_load_ps // Aligned load for packed registers
+#        define SIMD_PACKSTORELO_P _mm512_packstorelo_pd
+#        define SIMD_SET1_P _mm512_set1_pd
+#        define SIMD_SET_EPI _mm512_set_epi32
+#        define SIMD_SET1_EPI _mm512_set1_epi32
+#        define SIMD_I32GATHER_P _mm512_i32logather_pd
+#        define SIMD_I32SCATTER_P _mm512_i32loscatter_pd
+#        define SIMD_ADD_P _mm512_add_pd
+#        define SIMD_FMADD_P _mm512_fmadd_pd
+#        define SIMD_FNMADD_P _mm512_fnmadd_pd
+#        define SIMD_ADD_EPI _mm512_add_epi32
+#        define SIMD_SUB_P _mm512_sub_pd
+#        define SIMD_SUB_EPI _mm512_sub_epi32
+#        define SIMD_MUL_P _mm512_mul_pd
+#        define SIMD_DIV_P _mm512_div_pd
+#      else
+#        error "Macro definition FPPREC unrecognized for Xeon/Xeon Phi processors"
+#      endif
+#      pragma offload_attribute(pop)
+
+#    else
+#      error "No vector ISA intrinsics are defined. "
+#    endif
 #  endif
 #else
-#  pragma offload_attribute(push, target(mic))
-#  ifdef __MIC__ // Or #ifdef __KNC__ - more general option, future proof,
-                 // __INTEL_OFFLOAD is another option
-#    include "mic/micvec.h"
-#    if FPPREC == 0
-// Xeon Phi float
-#      define VECTOR F32vec16
-#      define SIMD_REG __m512            // Name of Packed REGister
-#      define SIMD_REGI __m512i          // Name of Packed integer REGister
-#      define SIMD_LOAD_P _mm512_load_ps // Aligned load for packed registers
-#      define SIMD_PACKSTORELO_P _mm512_packstorelo_ps
-#      define SIMD_SET1_P _mm512_set1_ps
-#      define SIMD_SET_EPI _mm512_set_epi32
-#      define SIMD_SET1_EPI _mm512_set1_epi32
-#      define SIMD_I32GATHER_P _mm512_i32gather_ps
-#      define SIMD_I32SCATTER_P _mm512_i32scatter_ps
-#      define SIMD_ADD_P _mm512_add_ps
-#      define SIMD_FMADD_P _mm512_fmadd_ps
-#      define SIMD_FNMADD_P _mm512_fnmadd_ps
-#      define SIMD_ADD_EPI _mm512_add_epi32
-#      define SIMD_SUB_P _mm512_sub_ps
-#      define SIMD_SUB_EPI _mm512_sub_epi32
-#      define SIMD_MUL_P _mm512_mul_ps
-#      define SIMD_DIV_P _mm512_div_ps
-#      define SIMD_RCP_P _mm512_rcp23_ps
-#    elif FPPREC == 1
-// Xeon Phi double
-#      define VECTOR F64vec8
-#      define SIMD_REG __m512d           // Name of Packed REGister
-#      define SIMD_REGI __m512i          // Name of Packed integer REGister
-#      define SIMD_LOAD_P _mm512_load_ps // Aligned load for packed registers
-#      define SIMD_PACKSTORELO_P _mm512_packstorelo_pd
-#      define SIMD_SET1_P _mm512_set1_pd
-#      define SIMD_SET_EPI _mm512_set_epi32
-#      define SIMD_SET1_EPI _mm512_set1_epi32
-#      define SIMD_I32GATHER_P _mm512_i32logather_pd
-#      define SIMD_I32SCATTER_P _mm512_i32loscatter_pd
-#      define SIMD_ADD_P _mm512_add_pd
-#      define SIMD_FMADD_P _mm512_fmadd_pd
-#      define SIMD_FNMADD_P _mm512_fnmadd_pd
-#      define SIMD_ADD_EPI _mm512_add_epi32
-#      define SIMD_SUB_P _mm512_sub_pd
-#      define SIMD_SUB_EPI _mm512_sub_epi32
-#      define SIMD_MUL_P _mm512_mul_pd
-#      define SIMD_DIV_P _mm512_div_pd
+// GCC / OpenCL vector extensions
+#  ifdef __GNUC__
+#    define __assume_aligned(var, align)
+#    define ASSUME_ALIGNED(align) __attribute__((assume_aligned(align)))
+#    ifdef __clang__
+#      define shufflevector4 __builtin_shufflevector
+#      define shufflevector8 __builtin_shufflevector
 #    else
-#      error "Macro definition FPPREC unrecognized for Xeon/Xeon Phi processors"
+#      define shufflevector4(v1,v2,i1,i2,i3,i4)             __builtin_shuffle(v1,v2,(v4si){i1,i2,i3,i4})
+#      define shufflevector8(v1,v2,i1,i2,i3,i4,i5,i6,i7,i8) __builtin_shuffle(v1,v2,(v8si){i1,i2,i3,i4,i5,i6,i7,i8})
 #    endif
-#    pragma offload_attribute(pop)
-
+#    if FPPREC == 0
+// float
+       typedef float VECTOR __attribute__((vector_size(SIMD_WIDTH)));
+       typedef int32_t v4si __attribute__ ((vector_size (4*sizeof(int32_t))));
+       typedef int32_t v8si __attribute__ ((vector_size (8*sizeof(int32_t))));
+#    elif FPPREC == 1
+// double
+       typedef double VECTOR __attribute__((vector_size(SIMD_WIDTH)));
+       typedef int64_t v4si __attribute__ ((vector_size (4*sizeof(int64_t))));
+       typedef int64_t v8si __attribute__ ((vector_size (8*sizeof(int64_t))));
+#    else
+#      error "Macro definition FPPREC unrecognized for GCC vector extension"
+#    endif
+     typedef VECTOR SIMD_REG;
+#    define SIMD_LOAD_P(x) (x)
+#    define SIMD_STORE_P(ptr,x) (*(ptr))      // Aligned store for packed registers
+#    define SIMD_SET1_P(x) ((VECTOR){SIMD_DUPLICATE(x)}) // Set Packed register
+#    define SIMD_ADD_P(x,y) ((x)+(y))
+#    define SIMD_SUB_P(x,y) ((x)-(y))
+#    define SIMD_MUL_P(x,y) ((x)*(y))
+#    define SIMD_DIV_P(x,y) ((x)/(y))
+#    define SIMD_RCP_P(x)   ((VECTOR){SIMD_DUPLICATE(1.0F)}/(x))
+#    define SIMD_CONSTRUCTOR(type,val) type((VECTOR){SIMD_DUPLICATE(val)})
 #  else
-#    error "No vector ISA intrinsics are defined. "
+#    error "GCC vector extension only implemented for GCC and clang"
 #  endif
 #endif
 
