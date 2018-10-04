@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.8)
 
-option(INTEL_CC "Use the Intel compiler." ON) 
+option(INTEL_CC "Use the Intel compiler." OFF) 
 #option(INTEL_VECTOR_INTRINSICS "Use Intel vector intrinsics." OFF)
 option(BUILD_FOR_CPU "Build library for CPU architecture." ON)
 option(BUILD_FOR_MIC "Build library for MIC architecture." OFF) 
