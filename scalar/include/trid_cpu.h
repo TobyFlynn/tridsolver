@@ -79,6 +79,15 @@ tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
                                    int ndim, int solvedim, int *dims,
                                    int *pads);
 
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchPadded(const float *a, const int *a_pad, const float *b, const int *b_pad,
+                                   const float *c, const int *c_pad, float *d, const int *d_pad,
+                                   int ndim, int solvedim, int *dims);
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchPadded(const double *a, const int *a_pad, const double *b, const int *b_pad,
+                                   const double *c, const int *c_pad, double *d, const int *d_pad,
+                                   int ndim, int solvedim, int *dims);
+
 //
 // Solve a batch of linear equation systems along a specified axis.
 //
@@ -101,6 +110,14 @@ tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
                                       int ndim, int solvedim, int *dims,
                                       int *pads);
 
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchPaddedInc(const float *a, const int *a_pad, const float *b, const int *b_pad,
+                                   const float *c, const int *c_pad, float *d, const int *d_pad, float *u, const int *u_pad,
+                                   int ndim, int solvedim, int *dims);
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchPaddedInc(const double *a, const int *a_pad, const double *b, const int *b_pad,
+                                   const double *c, const int *c_pad, double *d, const int *d_pad, double *u, const int *u_pad,
+                                   int ndim, int solvedim, int *dims);
 
 
 
