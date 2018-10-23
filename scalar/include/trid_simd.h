@@ -68,6 +68,22 @@
 #      define SIMD_VEC                                                         \
         (SIMD_WIDTH / FBYTE) // Number of 4 byte floats in a SIMD vector unit
 #    endif
+#  elif defined(__AVX512F__)
+#    if FPPREC == 0
+// AVX512 float
+#      define FBYTE 4
+#      define SIMD_WIDTH (64) // Width of SIMD vector unit in bytes
+#      define SIMD_VEC                                                         \
+        (SIMD_WIDTH / FBYTE) // Number of 4 byte floats in a SIMD vector unit
+#      define SIMD_DUPLICATE(x) x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x
+#    elif FPPREC == 1
+// AVX512 double
+#      define FBYTE 8
+#      define SIMD_WIDTH (64) // Width of SIMD vector unit in bytes
+#      define SIMD_VEC                                                         \
+        (SIMD_WIDTH / FBYTE) // Number of 8 byte floats in a SIMD vector unit
+#      define SIMD_DUPLICATE(x) x,x,x,x,x,x,x,x
+#    endif
 #  else
 #    if FPPREC == 0
 // AVX float
