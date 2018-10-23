@@ -202,6 +202,10 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
      sys_n *= (i == solvedim) ? 1 : dims[i];
   }
 
+  /* protect against multiply-by-zero on lower-dimensional problems later */
+  if ( ndim < 3 && dims[2] == 0 ) dims[2] = 1;
+  if ( ndim < 2 && dims[1] == 0 ) dims[1] = 1;
+  if ( ndim < 3 && pads[2] == 0 ) pads[2] = 1;
 
   if (solvedim == 0) {
     
@@ -230,11 +234,6 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
     int size_needed = sizeof(REAL)*sys_pads*sys_n_lin;
 
     if ( size_needed > alloc_size ) {
-#if 0
-       if ( alloc_size == 0 ) {
-          cudaFuncSetCacheConfig(transpose_readWrite_alignment_kernel<double, double, 1, false, 6, 4, 4>, cudaFuncCachePreferShared);
-       }
-#endif
        if ( aT ) cudaFree( aT ); cudaMalloc(&aT, size_needed);
        if ( bT ) cudaFree( bT ); cudaMalloc(&bT, size_needed);
        if ( cT ) cudaFree( cT ); cudaMalloc(&cT, size_needed);
@@ -256,8 +255,9 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
 
     assert(ndim <= 3);
     int newDims[MAXDIM] = {dims[1]*dims[2], dims[0]};
-    int newPads[MAXDIM] = {pads[1], pads[0]};
-    tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, ndim-1, 1, newDims, newPads, opts, sync);
+    int newPads[MAXDIM] = {pads[1]*pads[2], pads[0]};
+    int newNumDim = max(ndim-1, 2);
+    tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, newNumDim, 1, newDims, newPads, opts, sync);
 
     cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
     if ( INC ) transpose(handle, n, m, uT, d_u);
