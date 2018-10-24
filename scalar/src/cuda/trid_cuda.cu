@@ -202,69 +202,82 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
      sys_n *= (i == solvedim) ? 1 : dims[i];
   }
 
-  /* protect against multiply-by-zero on lower-dimensional problems later */
-  if ( ndim < 3 && dims[2] == 0 ) dims[2] = 1;
-  if ( ndim < 2 && dims[1] == 0 ) dims[1] = 1;
-  if ( ndim < 3 && pads[2] == 0 ) pads[2] = 1;
 
   if (solvedim == 0) {
-    
-    // int sys_stride = 1;       // Stride between the consecutive elements of a
-    // system
-    int sys_pads = pads[0]; // Padded sizes along each ndim number of dimensions
-    int sys_n_lin =
-        dims[1] * dims[2]; // = cumdims[solve] // Number of systems to be solved
-#if 0
-    int sys_size = dims[0]; // Size (length) of a system
-    int opt = opts[0];
-    trid_linearlayout_cuda<REAL, INC>(&d_a, &d_b, &d_c, &d_d, &d_u, sys_size,
-                                    sys_pads, sys_n_lin, opt);
-#else
-    static REAL *aT = NULL;
-    static REAL *bT = NULL;
-    static REAL *cT = NULL;
-    static REAL *dT = NULL;
-    static REAL *uT = NULL;
-    static int alloc_size = 0;
 
-    static cublasHandle_t handle = 0;
-
-    if ( !handle ) cublasCreate(&handle);
-
-    int size_needed = sizeof(REAL)*sys_pads*sys_n_lin;
-
-    if ( size_needed > alloc_size ) {
-       if ( aT ) cudaFree( aT ); cudaMalloc(&aT, size_needed);
-       if ( bT ) cudaFree( bT ); cudaMalloc(&bT, size_needed);
-       if ( cT ) cudaFree( cT ); cudaMalloc(&cT, size_needed);
-       if ( dT ) cudaFree( dT ); cudaMalloc(&dT, size_needed);
-       if ( INC ) { if ( uT ) cudaFree( uT ); cudaMalloc(&uT, size_needed); }
-
-       alloc_size = size_needed;
+    /* If there is padding in the Y-dimension, this solver will break down */
+    bool foundBadPadding = false;
+    for ( int i = 1 ; i < ndim-1 ; i++ ) {
+        foundBadPadding |= (pads[i] > 0);
+    }
+    if ( foundBadPadding ) {
+        printf("CUDA solver for Trid MultiDimBatchSolve is not currently "
+                "capable of solving systems with padding in the 'Y' "
+                "dimension.\n");
+        exit(-1);
     }
 
-    size_t m = sys_n_lin;  /* Maybe need to swap? */
-    size_t n = sys_pads;
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
-    transpose(handle, m, n, d_a, aT);
-    transpose(handle, m, n, d_b, bT);
-    transpose(handle, m, n, d_c, cT);
-    transpose(handle, m, n, d_d, dT);
-    if ( INC) transpose(handle, m, n, d_u, uT);
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    /* Padded size of solve dimension */
+    int sys_pads = pads[0];
+    /* Number of systems to solve */
+    int sys_n_lin = 1;
+    for ( int i = 1 ; i < ndim ; i++ ) {
+        sys_n_lin *= dims[i];
+    }
 
-    assert(ndim <= 3);
-    int newDims[MAXDIM] = {dims[1]*dims[2], dims[0]};
-    int newPads[MAXDIM] = {pads[1]*pads[2], pads[0]};
-    int newNumDim = max(ndim-1, 2);
-    tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, newNumDim, 1, newDims, newPads, opts, sync);
+    if ( ndim == 1) {
 
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
-    if ( INC ) transpose(handle, n, m, uT, d_u);
-    else transpose(handle, n, m, dT, d_d);
-    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+        int sys_size = dims[0]; // Size (length) of a system
+        int opt = opts[0];
+        trid_linearlayout_cuda<REAL, INC>(&d_a, &d_b, &d_c, &d_d, &d_u, sys_size,
+                sys_pads, sys_n_lin, opt);
+    } else {
+        /* protect against multiply-by-zero on lower-dimensional problems later */
+        static REAL *aT = NULL;
+        static REAL *bT = NULL;
+        static REAL *cT = NULL;
+        static REAL *dT = NULL;
+        static REAL *uT = NULL;
+        static int alloc_size = 0;
 
-#endif
+        static cublasHandle_t handle = 0;
+
+        if ( !handle ) cublasCreate(&handle);
+
+        int size_needed = sizeof(REAL)*sys_pads*sys_n_lin;
+
+        if ( size_needed > alloc_size ) {
+            if ( aT ) cudaFree( aT ); cudaMalloc(&aT, size_needed);
+            if ( bT ) cudaFree( bT ); cudaMalloc(&bT, size_needed);
+            if ( cT ) cudaFree( cT ); cudaMalloc(&cT, size_needed);
+            if ( dT ) cudaFree( dT ); cudaMalloc(&dT, size_needed);
+            if ( INC ) { if ( uT ) cudaFree( uT ); cudaMalloc(&uT, size_needed); }
+
+            alloc_size = size_needed;
+        }
+
+        size_t m = sys_n_lin;  /* Maybe need to swap? */
+        size_t n = sys_pads;
+        cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+        transpose(handle, m, n, d_a, aT);
+        transpose(handle, m, n, d_b, bT);
+        transpose(handle, m, n, d_c, cT);
+        transpose(handle, m, n, d_d, dT);
+        if ( INC) transpose(handle, m, n, d_u, uT);
+        cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
+        assert(ndim <= 3);
+        int newDims[MAXDIM] = {sys_n_lin, dims[0]};
+        int newPads[MAXDIM] = {sys_n_lin, pads[0]}; /* Assumption of no actual padding in original Y (& Z) dimensions */
+        int newNumDim = max(ndim-1, 2); /* Linearized Y&Z dimensions, so potentially reduced to 2D problem */
+        tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, newNumDim, 1, newDims, newPads, opts, sync);
+
+        cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+        if ( INC ) transpose(handle, n, m, uT, d_u);
+        else transpose(handle, n, m, dT, d_d);
+        cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+
+    }
   } else {
     if (solvedim == 1 && opts[1] == 3) { // If y-solve and ThomasPCR
      
