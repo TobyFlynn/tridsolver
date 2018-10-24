@@ -61,7 +61,7 @@
     asm volatile( "mov.b64 %0, {%1,%2};" : "=d"(x) : "r"(lo), "r"(hi) );
     return x;
   }
-#elif __CUDA_ARCH__ >= 600
+#elif __CUDACC_VER_MAJOR__ >= 9
   /* Regular __shfl()-type functions have been deprecated.  Use Sync versions */
 /* Against the advice of NVIDIA's blog: https://devblogs.nvidia.com/using-cuda-warp-level-primitives/ */
 #define FULL_MASK 0xffffffff
