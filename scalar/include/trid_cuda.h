@@ -81,6 +81,14 @@ EXTERN_C
 tridStatus_t tridSmtsvStridedBatch(const float *a, const float *b, const float *c, float *d, float* u, int ndim, int solvedim, int *dims, int *pads, int *opts, int sync);
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b, const double *c, double *d, double* u, int ndim, int solvedim, int *dims, int *pads, int *opts, int sync);
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchPadded(const double *a, const int *a_pads,
+                                   const double *b, const int *b_pads,
+                                   const double *c, const int *c_pads,
+                                   double *d, const int *d_pads,
+                                   double *u, const int *u_pads,
+                                   int ndim, int solvedim, int *dims,
+                                   int *opts, int sync);
 //tridStatus_t tridSmtsvStridedBatch(int ndim, int* sys_size, const float* a, const float *b, const float *c, float *d, int *sys_stride, int solvedim);
 //tridStatus_t tridDmtsvStridedBatch(int ndim, int* sys_size, const double* a, const double *b, const double *c, double *d, int *sys_stride, int solvedim);
 //tridStatus_t tridCmtsvStridedBatch(int ndim, int* sys_size, const complexf* a, const complexf *b, const complexf *c, complexf *d, int *sys_stride, int solvedim);
@@ -90,6 +98,14 @@ EXTERN_C
 tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b, const float *c, float *d, float* u, int ndim, int solvedim, int *dims, int *pads, int *opts, int sync);
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b, const double *c, double *d, double* u, int ndim, int solvedim, int *dims, int *pads, int *opts, int sync);
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchPaddedInc(const double *a, const int *a_pads,
+                                   const double *b, const int *b_pads,
+                                   const double *c, const int *c_pads,
+                                   double *d, const int *d_pads,
+                                   double *u, const int *u_pads,
+                                   int ndim, int solvedim, int *dims,
+                                   int *opts, int sync);
 //tridStatus_t tridSmtsvStridedBatchInc(int ndim, int* sys_size, const float* a, const float *b, const float *c, float *d, float *u, int *sys_stride, int solvedim);
 //tridStatus_t tridDmtsvStridedBatchInc(int ndim, int* sys_size, const double* a, const double *b, const double *c, double *d, double *u, int *sys_stride, int solvedim);
 //tridStatus_t tridCmtsvStridedBatchInc(int ndim, int* sys_size, const complexf* a, const complexf *b, const complexf *c, complexf *d, complexf *u, int *sys_stride, int solvedim);

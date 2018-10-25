@@ -68,9 +68,6 @@
 // cusparseHandle_t handle_sp; // Handle for cuSPARSE setup
 
 
-    //TODO: THIS IS NOT THEAD SAFE!!
-    // Remove this, it has to come in through the argument list
-int opts[MAXDIM];
 
 
 
@@ -192,9 +189,13 @@ void transpose<double>(cublasHandle_t &handle, size_t mRows, size_t nCols, const
 }
 
 template <typename REAL, int INC>
-void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
-                            REAL *d_d, REAL *d_u, int ndim, int solvedim,
-                            int *dims, int *pads, int *opts, int sync) {
+void tridMultiDimBatchSolve(const REAL *d_a, const int *a_pads,
+                            const REAL *d_b, const int *b_pads,
+                            const REAL *d_c, const int *c_pads,
+                            REAL *d_d, const int *d_pads,
+                            REAL *d_u, const int *u_pads,
+                            int ndim, int solvedim,
+                            int *dims, int *opts, int sync) {
 
   //int sys_n = cumdims[ndim] / dims[solvedim]; // Number of systems to be solved
   int sys_n = 1;
@@ -208,7 +209,7 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
     /* If there is padding in the Y-dimension, this solver will break down */
     bool foundBadPadding = false;
     for ( int i = 1 ; i < ndim-1 ; i++ ) {
-        foundBadPadding |= (pads[i] > 0);
+        foundBadPadding |= (a_pads[i] > 0);
     }
     if ( foundBadPadding ) {
         printf("CUDA solver for Trid MultiDimBatchSolve is not currently "
@@ -218,7 +219,7 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
     }
 
     /* Padded size of solve dimension */
-    int sys_pads = pads[0];
+    int sys_pads = a_pads[0];
     /* Number of systems to solve */
     int sys_n_lin = 1;
     for ( int i = 1 ; i < ndim ; i++ ) {
@@ -232,7 +233,6 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
         trid_linearlayout_cuda<REAL, INC>(&d_a, &d_b, &d_c, &d_d, &d_u, sys_size,
                 sys_pads, sys_n_lin, opt);
     } else {
-        /* protect against multiply-by-zero on lower-dimensional problems later */
         static REAL *aT = NULL;
         static REAL *bT = NULL;
         static REAL *cT = NULL;
@@ -268,9 +268,10 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
 
         assert(ndim <= 3);
         int newDims[MAXDIM] = {sys_n_lin, dims[0]};
-        int newPads[MAXDIM] = {sys_n_lin, pads[0]}; /* Assumption of no actual padding in original Y (& Z) dimensions */
+        int newPads[MAXDIM] = {sys_n_lin, a_pads[0]}; /* Assumption of no actual padding in original Y (& Z) dimensions */
         int newNumDim = max(ndim-1, 2); /* Linearized Y&Z dimensions, so potentially reduced to 2D problem */
-        tridMultiDimBatchSolve<REAL, INC>(aT, bT, cT, dT, uT, newNumDim, 1, newDims, newPads, opts, sync);
+        /* TODO:  Better pads arrays */
+        tridMultiDimBatchSolve<REAL, INC>(aT, newPads, bT, newPads, cT, newPads, dT, newPads, uT, newPads, newNumDim, 1, newDims, opts, sync);
 
         cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
         if ( INC ) transpose(handle, n, m, uT, d_u);
@@ -346,18 +347,33 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
           dim3 dimBlock_float4(blockdimx_float4, blockdimy_float4);
 
           // Setup dimension and padding according to float4 loads/stores
-          dims[0] = dims[0] / 4;
-          pads[0] = dims[0];
+          int new_dims[MAXDIM];
+          int new_a_pads[MAXDIM];
+          int new_b_pads[MAXDIM];
+          int new_c_pads[MAXDIM];
+          int new_d_pads[MAXDIM];
+          int new_u_pads[MAXDIM];
+          memcpy(new_dims, dims, sizeof(int)*ndim);
+          memcpy(new_a_pads, a_pads, sizeof(int)*ndim);
+          memcpy(new_b_pads, b_pads, sizeof(int)*ndim);
+          memcpy(new_c_pads, c_pads, sizeof(int)*ndim);
+          memcpy(new_d_pads, d_pads, sizeof(int)*ndim);
+          if (INC) memcpy(new_u_pads, u_pads, sizeof(int)*ndim);
+          new_dims[0] = dims[0] / 4;
+          new_a_pads[0] /= 4;
+          new_b_pads[0] /= 4;
+          new_c_pads[0] /= 4;
+          new_d_pads[0] /= 4;
+          new_u_pads[0] /= 4;
           // trid_set_consts(ndim, dims, pads);
 
           trid_strided_multidim<float, float4, INC>(
               dimGrid_float4, dimBlock_float4,
-                  (float4 *)d_a, (float4 *)d_b, (float4 *)d_c, (float4 *)d_d,
-                  (float4 *)d_u, ndim, solvedim, sys_n_float4, dims, pads);
+                  (float4 *)d_a, new_a_pads, (float4 *)d_b, new_b_pads,
+                  (float4 *)d_c, new_c_pads, (float4 *)d_d, new_d_pads,
+                  (float4 *)d_u, new_u_pads, ndim, solvedim, sys_n_float4, new_dims);
 
-          dims[0] = dims[0] * 4;
-          pads[0] = dims[0];
-          // trid_set_consts(ndim, dims, pads);
+          // trid_set_consts(ndim, dims, a_pads);
         } else if (sizeof(REAL) == 8) {
 
           // Kernel launch configuration
@@ -373,18 +389,33 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
           dim3 dimGrid_double2(dimgridx_double2, dimgridy_double2);
           dim3 dimBlock_double2(blockdimx_double2, blockdimy_double2);
           // Setup dimension and padding according to double2 loads/stores
-          dims[0] = dims[0] / 2;
-          pads[0] = dims[0];
-          // trid_set_consts(ndim, dims, pads);
+          int new_dims[MAXDIM];
+          int new_a_pads[MAXDIM];
+          int new_b_pads[MAXDIM];
+          int new_c_pads[MAXDIM];
+          int new_d_pads[MAXDIM];
+          int new_u_pads[MAXDIM];
+          memcpy(new_dims, dims, sizeof(int)*ndim);
+          memcpy(new_a_pads, a_pads, sizeof(int)*ndim);
+          memcpy(new_b_pads, b_pads, sizeof(int)*ndim);
+          memcpy(new_c_pads, c_pads, sizeof(int)*ndim);
+          memcpy(new_d_pads, d_pads, sizeof(int)*ndim);
+          if (INC) memcpy(new_u_pads, u_pads, sizeof(int)*ndim);
+          new_dims[0] /= 2;
+          new_a_pads[0] /= 2;
+          new_b_pads[0] /= 2;
+          new_c_pads[0] /= 2;
+          new_d_pads[0] /= 2;
+          new_u_pads[0] /= 2;
+          // trid_set_consts(ndim, dims, a_pads);
 
           trid_strided_multidim<double, double2, INC>(
               dimGrid_double2, dimBlock_double2,
-                  (double2 *)d_a, (double2 *)d_b, (double2 *)d_c,
-                  (double2 *)d_d, (double2 *)d_u, ndim, solvedim,
-                  sys_n_double2, dims, pads);
+                  (double2 *)d_a, new_a_pads, (double2 *)d_b, new_b_pads,
+                  (double2 *)d_c, new_c_pads, (double2 *)d_d, new_d_pads,
+                  (double2 *)d_u, new_u_pads, ndim, solvedim,
+                  sys_n_double2, new_dims);
 
-          dims[0] = dims[0] * 2;
-          pads[0] = dims[0];
           // trid_set_consts(ndim, dims, pads);
         }
       } else {
@@ -399,7 +430,8 @@ void tridMultiDimBatchSolve(const REAL *d_a, const REAL *d_b, const REAL *d_c,
         dim3 dimBlock(blockdimx, blockdimy);
 
         trid_strided_multidim<REAL, REAL, INC>(dimGrid, dimBlock,
-            d_a, d_b, d_c, d_d, d_u, ndim, solvedim, sys_n, dims, pads);
+            d_a, a_pads, d_b, b_pads, d_c, c_pads, d_d, d_pads, d_u, u_pads,
+            ndim, solvedim, sys_n, dims);
       }
     }
     //      break;
@@ -484,8 +516,8 @@ tridStatus_t tridSmtsvStridedBatch(const float *a, const float *b,
                                    const float *c, float *d, float *u, int ndim,
                                    int solvedim, int *dims, int *pads,
                                    int *opts, int sync) {
-  tridMultiDimBatchSolve<float, 0>(a, b, c, d, NULL, ndim, solvedim, dims, pads,
-                                   opts, 1);
+  tridMultiDimBatchSolve<float, 0>(a, pads, b, pads, c, pads, d, pads, NULL, pads,
+                                     ndim, solvedim, dims, opts, 1);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -494,8 +526,20 @@ tridStatus_t tridDmtsvStridedBatch(const double *a, const double *b,
                                    const double *c, double *d, double *u,
                                    int ndim, int solvedim, int *dims, int *pads,
                                    int *opts, int sync) {
-  tridMultiDimBatchSolve<double, 0>(a, b, c, d, NULL, ndim, solvedim, dims,
-                                    pads, opts, 1);
+  tridMultiDimBatchSolve<double, 0>(a, pads, b, pads, c, pads, d, pads, NULL, pads,
+                                    ndim, solvedim, dims, opts, 1);
+  return TRID_STATUS_SUCCESS;
+}
+
+tridStatus_t tridDmtsvStridedBatchPadded(const double *a, const int *a_pads,
+                                   const double *b, const int *b_pads,
+                                   const double *c, const int *c_pads,
+                                   double *d, const int *d_pads,
+                                   double *u, const int *u_pads,
+                                   int ndim, int solvedim, int *dims,
+                                   int *opts, int sync) {
+  tridMultiDimBatchSolve<double, 0>(a, a_pads, b, b_pads, c, c_pads, d, d_pads, NULL, u_pads,
+                                    ndim, solvedim, dims, opts, 1);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -520,8 +564,8 @@ tridStatus_t tridSmtsvStridedBatchInc(const float *a, const float *b,
                                       const float *c, float *d, float *u,
                                       int ndim, int solvedim, int *dims,
                                       int *pads, int *opts, int sync) {
-  tridMultiDimBatchSolve<float, 1>(a, b, c, d, u, ndim, solvedim, dims, pads,
-                                   opts, 1);
+  tridMultiDimBatchSolve<float, 1>(a, pads, b, pads, c, pads, d, pads, u, pads,
+                                     ndim, solvedim, dims, opts, 1);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -530,8 +574,20 @@ tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
                                       const double *c, double *d, double *u,
                                       int ndim, int solvedim, int *dims,
                                       int *pads, int *opts, int sync) {
-  tridMultiDimBatchSolve<double, 1>(a, b, c, d, u, ndim, solvedim, dims, pads,
-                                    opts, 1);
+  tridMultiDimBatchSolve<double, 1>(a, pads, b, pads, c, pads, d, pads, u, pads,
+                                    ndim, solvedim, dims, opts, 1);
+  return TRID_STATUS_SUCCESS;
+}
+
+tridStatus_t tridDmtsvStridedBatchPaddedInc(const double *a, const int *a_pads,
+                                   const double *b, const int *b_pads,
+                                   const double *c, const int *c_pads,
+                                   double *d, const int *d_pads,
+                                   double *u, const int *u_pads,
+                                   int ndim, int solvedim, int *dims,
+                                   int *opts, int sync) {
+  tridMultiDimBatchSolve<double, 1>(a, a_pads, b, b_pads, c, c_pads, d, d_pads, u, u_pads,
+                                    ndim, solvedim, dims, opts, 1);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -552,6 +608,5 @@ tridStatus_t tridDmtsvStridedBatchInc(const double *a, const double *b,
 //}
 
 
-int *get_opts() { return opts; }
 
 void initTridMultiDimBatchSolve(int ndim, int* dims, int* pads) { }
