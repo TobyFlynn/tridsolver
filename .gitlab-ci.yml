@@ -1,0 +1,41 @@
+# Defines stages which are to be executed
+stages:
+  - build
+  - valgrind
+  - test
+  - helgrind
+  - clean
+
+# Stage "build"
+run-build:
+  stage: build
+  script:
+    - test-pdetk-submodule build tridsolver `git rev-parse HEAD`
+
+# Stage "test"
+run-test:
+  stage: test
+  dependencies: [run-build]
+  script:
+    - test-pdetk-submodule test tridsolver `git rev-parse HEAD`
+
+# Stage "valgrind"
+run-valgrind:
+  stage: valgrind
+  dependencies: [run-build]
+  script:
+    - test-pdetk-submodule valgrind tridsolver `git rev-parse HEAD`
+
+# Stage "helgrind"
+run-helgrind:
+  stage: helgrind
+  dependencies: [run-build]
+  script:
+    - test-pdetk-submodule helgrind tridsolver `git rev-parse HEAD`
+
+# Stage "clean"
+run-clean:
+  stage: clean
+  when: always
+  script:
+    - test-pdetk-submodule clean tridsolver `git rev-parse HEAD`
