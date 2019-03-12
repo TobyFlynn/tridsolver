@@ -121,17 +121,17 @@ void trid_linearlayout_cuda(const REAL **d_ax, const REAL **d_bx,
   int subBatchStride = 0;
 
   switch (opt) {
-  case 0:
+  case 1:
     trid_linear<REAL,INC><<<dimGrid_x, dimBlock_x>>>(
         *d_ax, *d_bx, *d_cx, *d_du, *d_u, sys_size, sys_pads, sys_n);
     cudaCheckMsg("trid_linear execution failed\n");
     break;
-  case 1:
+  case 2:
     trid_linear_shared<REAL><<<dimGrid_x, dimBlock_x, shared_mem_size>>>(
         *d_ax, *d_bx, *d_cx, *d_du, *d_u, sys_size, sys_pads, sys_n);
     cudaCheckMsg("trid_linear_shared execution failed\n");
     break;
-  case 2:
+  case 3:
     //#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >=300) // Only compiler if
     //register shuffle intrinsics exist on the device
     trid_linear_reg<REAL>(dimGrid_x, dimBlock_x, *d_ax, *d_bx, *d_cx, *d_du,
@@ -141,7 +141,7 @@ void trid_linearlayout_cuda(const REAL **d_ax, const REAL **d_bx,
     //  printf("This option is only valid for __CUDA_ARCH__ >= 300\n");
     //#endif
     break;
-  case 3:
+  case 4:
     //#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >=300) // Only compiler if
     //register shuffle intrinsics exist on the device
     // trid_linear_thomaspcr<REAL, WARP_SIZE>(*d_ax, *d_bx, *d_cx, *d_du, *d_u,
@@ -156,7 +156,7 @@ void trid_linearlayout_cuda(const REAL **d_ax, const REAL **d_bx,
     //  printf("This option is only valid for __CUDA_ARCH__ >= 300\n");
     //#endif
     break;
-  case 4:
+  case 5:
     // trid_linear_cusparse(handle_sp, d_ax, d_bx, d_cx, d_du, d_u, sys_stride,
     // sys_size, sys_pads, sys_n);
     cudaCheckMsg("trid_linear_cusparse execution failed\n");
@@ -208,8 +208,8 @@ void tridMultiDimBatchSolve(const REAL *d_a, const int *a_pads,
 
     /* If there is padding in the Y-dimension, this solver will break down */
     bool foundBadPadding = false;
-    for ( int i = 1 ; i < ndim-1 ; i++ ) {
-        foundBadPadding |= (a_pads[i] > 0);
+    for ( int i = 1 ; i < ndim ; i++ ) {
+        foundBadPadding |= (a_pads[i] != dims[i]);
     }
     if ( foundBadPadding ) {
         printf("CUDA solver for Trid MultiDimBatchSolve is not currently "
@@ -226,7 +226,7 @@ void tridMultiDimBatchSolve(const REAL *d_a, const int *a_pads,
         sys_n_lin *= dims[i];
     }
 
-    if ( ndim == 1) {
+    if ( ndim == 1 || opts[0] != 0) {
 
         int sys_size = dims[0]; // Size (length) of a system
         int opt = opts[0];
