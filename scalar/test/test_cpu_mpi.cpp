@@ -53,12 +53,14 @@ void require_allclose(const AlignedArray<Float, Align> &expected,
 template <typename Float> struct ToMpiDatatype {};
 
 template <> struct ToMpiDatatype<double> {
-  static const MPI_Datatype value = MPI_DOUBLE;
+  static const MPI_Datatype value;// = MPI_DOUBLE;
 };
+const MPI_Datatype ToMpiDatatype<double>::value = MPI_DOUBLE;
 
 template <> struct ToMpiDatatype<float> {
-  static const MPI_Datatype value = MPI_FLOAT;
+  static const MPI_Datatype value;// = MPI_FLOAT;
 };
+const MPI_Datatype ToMpiDatatype<float>::value = MPI_FLOAT;
 
 template <typename Float> void test_from_file(const std::string &file_name) {
   // The dimension of the MPI decomposition is the same as solve_dim
@@ -301,7 +303,7 @@ TEST_CASE("mpi: large", "[large]") {
         test_from_file<double>("files/four_dim_large_solve2");
       }
       SECTION("solvedim: 3") {
-        test_from_file<double>("files/four_dim_large_solve2");
+        test_from_file<double>("files/four_dim_large_solve3");
       }
     }
   }
@@ -337,7 +339,7 @@ TEST_CASE("mpi: large", "[large]") {
         test_from_file<float>("files/four_dim_large_solve2");
       }
       SECTION("solvedim: 3") {
-        test_from_file<float>("files/four_dim_large_solve2");
+        test_from_file<float>("files/four_dim_large_solve3");
       }
     }
   }
@@ -405,7 +407,7 @@ TEST_CASE("mpi: solver large", "[large]") {
         test_solver_from_file<double>("files/four_dim_large_solve2");
       }
       SECTION("solvedim: 3") {
-        test_solver_from_file<double>("files/four_dim_large_solve2");
+        test_solver_from_file<double>("files/four_dim_large_solve3");
       }
     }
   }
@@ -441,7 +443,7 @@ TEST_CASE("mpi: solver large", "[large]") {
         test_solver_from_file<float>("files/four_dim_large_solve2");
       }
       SECTION("solvedim: 3") {
-        test_solver_from_file<float>("files/four_dim_large_solve2");
+        test_solver_from_file<float>("files/four_dim_large_solve3");
       }
     }
   }
