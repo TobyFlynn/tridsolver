@@ -38,4 +38,29 @@ if (BUILD_TESTING)
       COMMAND "mpirun" -np ${MPI_TEST_NUM_PROC} $<TARGET_FILE:mpi_tests>
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   endif (BUILD_MPI_TESTS)
+
+  if(BUILD_FOR_GPU)
+    find_package(CUDA REQUIRED)
+    include(FindCUDA)
+
+    set(CUDA_64_BIT_DEVICE_CODE ON) # -m64 compiler option
+    set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+
+    set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS}         -arch sm_35 --ptxas-options=-v -Xptxas -dlcm=cg ")
+    set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG}   -g -G -O0 -ftz=false -fmad=false                ")
+    set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE} -O3                                             ")
+
+    cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/test/)
+    set(CUDA_LIBRARIES ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libcudart.so)
+    cuda_add_library(tridcuda_test_utils ${PROJECT_SOURCE_DIR}/test/test_cuda.cu SHARED OPTIONS -Xcompiler -fPIC) # Make binary relocatable
+
+    add_executable(cuda_tests catch_main.cpp)
+    target_link_libraries(cuda_tests Catch)
+    target_link_libraries(cuda_tests tridcuda tridcuda_test_utils)
+    target_include_directories(cuda_tests PRIVATE ${PROJECT_SOURCE_DIR}/include ./)
+    add_test(NAME catch_test_cuda
+      COMMAND cuda_tests
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+  endif (BUILD_FOR_GPU)
 endif (BUILD_TESTING)
