@@ -55,37 +55,34 @@ tridStatus_t tridStridedBatchWrapper<double>(const double *a, const double *b,
 }
 
 template <typename Float>
-void trid_scalar_wrapper(const Float *a, const Float *b, const Float *c,
-                         Float *d, Float *u, int N, int stride);
+void trid_scalar_wrapper(Float *a, Float *b, Float *c, Float *d, Float *u,
+                         int N, int stride);
 
 template <>
-void trid_scalar_wrapper<float>(const float *a, const float *b, const float *c,
-                                float *d, float *u, int N, int stride) {
+void trid_scalar_wrapper<float>(float *a, float *b, float *c, float *d,
+                                float *u, int N, int stride) {
   trid_scalarS(a, b, c, d, u, N, stride);
 }
 
 template <>
-void trid_scalar_wrapper<double>(const double *a, const double *b,
-                                 const double *c, double *d, double *u, int N,
-                                 int stride) {
+void trid_scalar_wrapper<double>(double *a, double *b, double *c, double *d,
+                                 double *u, int N, int stride) {
   trid_scalarD(a, b, c, d, u, N, stride);
 }
 
 template <typename Float>
-void trid_scalar_vec_wrapper(const Float *a, const Float *b, const Float *c,
-                             Float *d, Float *u, int N, int stride);
+void trid_scalar_vec_wrapper(Float *a, Float *b, Float *c, Float *d, Float *u,
+                             int N, int stride);
 
 template <>
-void trid_scalar_vec_wrapper<float>(const float *a, const float *b,
-                                    const float *c, float *d, float *u, int N,
-                                    int stride) {
+void trid_scalar_vec_wrapper<float>(float *a, float *b, float *c, float *d,
+                                    float *u, int N, int stride) {
   trid_scalar_vecS(a, b, c, d, u, N, stride);
 }
 
 template <>
-void trid_scalar_vec_wrapper<double>(const double *a, const double *b,
-                                     const double *c, double *d, double *u,
-                                     int N, int stride) {
+void trid_scalar_vec_wrapper<double>(double *a, double *b, double *c, double *d,
+                                     double *u, int N, int stride) {
   trid_scalar_vecD(a, b, c, d, u, N, stride);
 }
 
@@ -117,6 +114,9 @@ template <typename Float>
 void test_from_file_scalar(const std::string &file_name) {
   MeshLoader<Float> mesh(file_name);
   AlignedArray<Float, 1> d(mesh.d());
+  AlignedArray<Float, 1> a(mesh.a()); // Because it isn't const in the lib
+  AlignedArray<Float, 1> b(mesh.b()); // Because it isn't const in the lib
+  AlignedArray<Float, 1> c(mesh.c()); // Because it isn't const in the lib
 
   int stride = 1;
   for (size_t i = 0; i < mesh.solve_dim(); ++i) {
@@ -124,9 +124,9 @@ void test_from_file_scalar(const std::string &file_name) {
   }
   const size_t N = mesh.dims()[mesh.solve_dim()];
 
-  trid_scalar_wrapper<Float>(mesh.a().data(), // a
-                             mesh.b().data(), // b
-                             mesh.c().data(), // c
+  trid_scalar_wrapper<Float>(a.data(),        // a
+                             b.data(),        // b
+                             c.data(),        // c
                              d.data(),        // d
                              nullptr,         // u
                              N,               // N
@@ -139,6 +139,12 @@ template <typename Float>
 void test_from_file_scalar_vec(const std::string &file_name) {
   MeshLoader<Float, SIMD_WIDTH> mesh(file_name);
   AlignedArray<Float, SIMD_WIDTH> d(mesh.d());
+  AlignedArray<Float, SIMD_WIDTH> a(
+      mesh.a()); // Because it isn't const in the lib
+  AlignedArray<Float, SIMD_WIDTH> b(
+      mesh.b()); // Because it isn't const in the lib
+  AlignedArray<Float, SIMD_WIDTH> c(
+      mesh.c()); // Because it isn't const in the lib
 
   int stride = 1;
   for (size_t i = 0; i < mesh.solve_dim(); ++i) {
@@ -146,9 +152,9 @@ void test_from_file_scalar_vec(const std::string &file_name) {
   }
   const size_t N = mesh.dims()[mesh.solve_dim()];
 
-  trid_scalar_vec_wrapper<Float>(mesh.a().data(), // a
-                                 mesh.b().data(), // b
-                                 mesh.c().data(), // c
+  trid_scalar_vec_wrapper<Float>(a.data(),        // a
+                                 b.data(),        // b
+                                 c.data(),        // c
                                  d.data(),        // d
                                  nullptr,         // u
                                  N,               // N
