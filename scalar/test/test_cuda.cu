@@ -80,76 +80,96 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   require_allclose(mesh.u(), d);
 }
 
-TEST_CASE("cuda: large") {
+TEST_CASE("cuda: solveX", "[solvedim:0]") {
   SECTION("double") {
     SECTION("ndims: 2") {
-      SECTION("solvedim: 0") {
-        test_from_file<double>("files/two_dim_large_solve0");
-      }
-      SECTION("solvedim: 1") {
-        test_from_file<double>("files/two_dim_large_solve1");
-      }
+      test_from_file<double>("files/two_dim_large_solve0");
     }
     SECTION("ndims: 3") {
-      SECTION("solvedim: 0") {
-        test_from_file<double>("files/three_dim_large_solve0");
-      }
-      SECTION("solvedim: 1") {
-        test_from_file<double>("files/three_dim_large_solve1");
-      }
+      test_from_file<double>("files/three_dim_large_solve0");
+    }
+    // SECTION("ndims: 4") {
+    //   test_from_file<double>("files/four_dim_large_solve0");
+    // }
+  }
+  SECTION("float") {
+    SECTION("ndims: 2") {
+      test_from_file<float>("files/two_dim_large_solve0");
+    }
+    SECTION("ndims: 3") {
+      test_from_file<float>("files/three_dim_large_solve0");
+    }
+    // SECTION("ndims: 4") {
+    //   test_from_file<float>("files/four_dim_large_solve0");
+    // }
+  }
+}
+
+TEST_CASE("cuda: solveY", "[solvedim:1]") {
+  SECTION("double") {
+    SECTION("ndims: 2") {
+      test_from_file<double>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_from_file<double>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_from_file<double>("files/four_dim_large_solve1");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 2") {
+      test_from_file<float>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_from_file<float>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_from_file<float>("files/four_dim_large_solve1");
+    }
+  }
+}
+
+TEST_CASE("cuda: solveZ", "[solvedim:2]") {
+  SECTION("double") {
+    SECTION("ndims: 3") {
       SECTION("solvedim: 2") {
         test_from_file<double>("files/three_dim_large_solve2");
       }
     }
     SECTION("ndims: 4") {
-      SECTION("solvedim: 0") {
-        test_from_file<double>("files/four_dim_large_solve0");
-      }
-      SECTION("solvedim: 1") {
-        test_from_file<double>("files/four_dim_large_solve1");
-      }
       SECTION("solvedim: 2") {
         test_from_file<double>("files/four_dim_large_solve2");
       }
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 3") {
+      SECTION("solvedim: 2") {
+        test_from_file<float>("files/three_dim_large_solve2");
+      }
+    }
+    SECTION("ndims: 4") {
+      SECTION("solvedim: 2") {
+        test_from_file<float>("files/four_dim_large_solve2");
+      }
+    }
+  }
+}
+
+TEST_CASE("cuda: solve3", "[solvedim:3]") {
+  SECTION("double") {
+    SECTION("ndims: 4") {
       SECTION("solvedim: 3") {
         test_from_file<double>("files/four_dim_large_solve3");
       }
     }
   }
   SECTION("float") {
-    SECTION("ndims: 2") {
-      SECTION("solvedim: 0") {
-        test_from_file<float>("files/two_dim_large_solve0");
-      }
-      SECTION("solvedim: 0") {
-        test_from_file<float>("files/two_dim_large_solve1");
-      }
-    }
-    SECTION("ndims: 3") {
-      SECTION("solvedim: 0") {
-        test_from_file<float>("files/three_dim_large_solve0");
-      }
-      SECTION("solvedim: 1") {
-        test_from_file<float>("files/three_dim_large_solve1");
-      }
-      SECTION("solvedim: 2") {
-        test_from_file<float>("files/three_dim_large_solve2");
-      }
-    }
     SECTION("ndims: 4") {
-      SECTION("solvedim: 0") {
-        test_from_file<float>("files/four_dim_large_solve0");
-      }
-      SECTION("solvedim: 1") {
-        test_from_file<float>("files/four_dim_large_solve1");
-      }
-      SECTION("solvedim: 2") {
-        test_from_file<float>("files/four_dim_large_solve2");
-      }
       SECTION("solvedim: 3") {
         test_from_file<float>("files/four_dim_large_solve3");
       }
     }
   }
 }
-

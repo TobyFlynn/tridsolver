@@ -53,6 +53,7 @@ if (BUILD_TESTING)
     cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/test/)
     set(CUDA_LIBRARIES ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libcudart.so)
     cuda_add_library(tridcuda_test_utils ${PROJECT_SOURCE_DIR}/test/test_cuda.cu SHARED OPTIONS -Xcompiler -fPIC) # Make binary relocatable
+    cuda_add_cublas_to_target(tridcuda_test_utils)
 
     add_executable(cuda_tests catch_main.cpp)
     target_link_libraries(cuda_tests Catch)
