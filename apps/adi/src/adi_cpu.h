@@ -13,7 +13,7 @@
 // linux timing routine
 //
 
-__attribute__((target(mic)))
+//__attribute__((target(mic)))
 inline double elapsed_time(double *et) {
   struct timeval t;
   double old_time = *et;
@@ -24,12 +24,12 @@ inline double elapsed_time(double *et) {
   return *et - old_time;
 }
 
-__attribute__((target(mic)))
+//__attribute__((target(mic)))
 inline void timing_start(int prof, double *timer) {
   if(prof==1) elapsed_time(timer);
 }
 
-__attribute__((target(mic)))
+//__attribute__((target(mic)))
 inline void timing_end(int prof, double *timer, double *elapsed_accumulate, char *str) {
   double elapsed;
   if(prof==1) {

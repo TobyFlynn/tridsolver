@@ -38,7 +38,6 @@
 #include <getopt.h>
 #include <float.h>
 #define FP double
-
 #include "adi_cpu.h"
 #include "adi_mpi.h"
 #include "preproc_mpi.hpp"
