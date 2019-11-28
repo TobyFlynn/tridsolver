@@ -119,33 +119,31 @@ tridStatus_t tridDmtsvStridedBatchPaddedInc(const double *a, const int *a_pad, c
                                    const double *c, const int *c_pad, double *d, const int *d_pad, double *u, const int *u_pad,
                                    int ndim, int solvedim, int *dims);
 
-
-
-
 EXTERN_C
-void trid_scalarS(float *a, float *b, float *c, float *d, float *u, int N,
-                  int stride);
+void trid_scalarS(const float *a, const float *b, const float *c, float *d,
+                  float *u, int N, int stride);
 EXTERN_C
-void trid_x_transposeS(float *a, float *b, float *c, float *d, float *u,
-                       int sys_size, int sys_pad, int stride);
+void trid_x_transposeS(const float *a, const float *b, const float *c, float *d,
+                       float *u, int sys_size, int sys_pad, int stride);
 EXTERN_C
-void trid_scalar_vecS(float *a, float *b, float *c, float *d, float *u, int N,
-                      int stride);
+void trid_scalar_vecS(const float *a, const float *b, const float *c, float *d,
+                      float *u, int N, int stride);
 EXTERN_C
-void trid_scalar_vecSInc(float *a, float *b, float *c, float *d, float *u,
-                         int N, int stride);
+void trid_scalar_vecSInc(const float *a, const float *b, const float *c,
+                         float *d, float *u, int N, int stride);
 
 EXTERN_C
-void trid_scalarD(double *a, double *b, double *c, double *d, double *u, int N,
-                  int stride);
+void trid_scalarD(const double *a, const double *b, const double *c, double *d,
+                  double *u, int N, int stride);
 EXTERN_C
-void trid_x_transposeD(double *a, double *b, double *c, double *d, double *u,
-                       int sys_size, int sys_pad, int stride);
+void trid_x_transposeD(const double *a, const double *b, const double *c,
+                       double *d, double *u, int sys_size, int sys_pad,
+                       int stride);
 EXTERN_C
-void trid_scalar_vecD(double *a, double *b, double *c, double *d, double *u,
-                      int N, int stride);
+void trid_scalar_vecD(const double *a, const double *b, const double *c,
+                      double *d, double *u, int N, int stride);
 EXTERN_C
-void trid_scalar_vecDInc(double *a, double *b, double *c, double *d, double *u,
-                         int N, int stride);
+void trid_scalar_vecDInc(const double *a, const double *b, const double *c,
+                         double *d, double *u, int N, int stride);
 
 #endif
