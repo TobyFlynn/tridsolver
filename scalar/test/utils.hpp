@@ -31,6 +31,10 @@ public:
    * Only when not allocated in ctor
    */
   void allocate(size_t capacity);
+  /**
+   * Only when size is 0
+   */
+  void resize(size_t size, T default_val = T());
 
   T *data() { return reinterpret_cast<T *>(padded_data + padding); }
 
@@ -52,7 +56,7 @@ public:
 
   size_t capacity() const { return _capacity; }
 
-  friend void std::swap(AlignedArray<T, Align>, AlignedArray<T, Align>);
+  friend void std::swap(AlignedArray<T, Align> &, AlignedArray<T, Align> &);
 };
 
 template <typename Float, unsigned Align = 1> class MeshLoader {
@@ -108,7 +112,7 @@ AlignedArray<T, Align>::AlignedArray(const AlignedArray &other, size_t start,
     : padded_data{nullptr}, _size{0}, _capacity{0} {
   allocate(end - start);
   std::copy(other.data() + start, other.data() + end, this->data());
-  _size = end-start;
+  _size = end - start;
 }
 
 template <typename T, unsigned Align>
@@ -124,7 +128,7 @@ AlignedArray<T, Align>::AlignedArray(AlignedArray &&other) : AlignedArray{} {
 
 namespace std {
 template <typename T, unsigned Align>
-void swap(AlignedArray<T, Align> lhs, AlignedArray<T, Align> rhs) {
+void swap(AlignedArray<T, Align> &lhs, AlignedArray<T, Align> &rhs) {
   std::swap(lhs._capacity, rhs._capacity);
   std::swap(lhs._size, rhs._size);
   std::swap(lhs.padded_data, rhs.padded_data);
@@ -145,6 +149,16 @@ void AlignedArray<T, Align>::allocate(size_t capacity) {
     padding = 0;
   } else {
     padding = Align - (ptr % Align);
+  }
+}
+
+template <typename T, unsigned Align>
+void AlignedArray<T, Align>::resize(size_t size, T default_val) {
+  if (_capacity == 0)
+    allocate(size);
+  assert(_size == 0 && "Array has already been initialised");
+  for (int i = 0; i < size; ++i) {
+    this->push_back(default_val);
   }
 }
 

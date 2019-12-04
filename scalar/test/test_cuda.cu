@@ -63,20 +63,21 @@ template <typename Float> void test_from_file(const std::string &file_name) {
   GPUMesh<Float> device_mesh(mesh);
 
   const tridStatus_t status =
-      tridStridedBatchWrapper<Float>(device_mesh.a(),    // a
-                                     device_mesh.b(),    // b
-                                     device_mesh.c(),    // c
-                                     device_mesh.d(),    // d
-                                     nullptr,            // u
-                                     mesh.dims().size(), // ndim
-                                     mesh.solve_dim(),   // solvedim
-                                     dims.data(),        // dims
-                                     dims.data());       // pads
+      tridStridedBatchWrapper<Float>(device_mesh.a().data(), // a
+                                     device_mesh.b().data(), // b
+                                     device_mesh.c().data(), // c
+                                     device_mesh.d().data(), // d
+                                     nullptr,                // u
+                                     mesh.dims().size(),     // ndim
+                                     mesh.solve_dim(),       // solvedim
+                                     dims.data(),            // dims
+                                     dims.data());           // pads
 
   CHECK(status == TRID_STATUS_SUCCESS);
 
   AlignedArray<Float, 1> d(mesh.d());
-  cudaMemcpy(d.data(), device_mesh.d(), d.size() * sizeof(Float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(d.data(), device_mesh.d().data(), d.size() * sizeof(Float),
+             cudaMemcpyDeviceToHost);
   require_allclose(mesh.u(), d);
 }
 
@@ -93,9 +94,7 @@ TEST_CASE("cuda: solveX", "[solvedim:0]") {
     // }
   }
   SECTION("float") {
-    SECTION("ndims: 2") {
-      test_from_file<float>("files/two_dim_large_solve0");
-    }
+    SECTION("ndims: 2") { test_from_file<float>("files/two_dim_large_solve0"); }
     SECTION("ndims: 3") {
       test_from_file<float>("files/three_dim_large_solve0");
     }
@@ -118,9 +117,7 @@ TEST_CASE("cuda: solveY", "[solvedim:1]") {
     }
   }
   SECTION("float") {
-    SECTION("ndims: 2") {
-      test_from_file<float>("files/two_dim_large_solve1");
-    }
+    SECTION("ndims: 2") { test_from_file<float>("files/two_dim_large_solve1"); }
     SECTION("ndims: 3") {
       test_from_file<float>("files/three_dim_large_solve1");
     }

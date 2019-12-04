@@ -63,5 +63,23 @@ if (BUILD_TESTING)
       COMMAND cuda_tests
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+    if (BUILD_MPI_TESTS)
+      find_package(CUDA REQUIRED)
+      include(FindCUDA)
+      set(MPI_TEST_NUM_PROC "2" CACHE STRING
+        "The number of processes to launch in MPI tests.")
+      find_package(MPI REQUIRED)
+      cuda_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+      cuda_include_directories(${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/test/)
+      cuda_add_executable(cuda_mpi_tests catch_mpi_main.cpp test_cuda_mpi.cu)
+      cuda_add_cublas_to_target(cuda_mpi_tests)
+      target_link_libraries(cuda_mpi_tests Catch)
+      target_link_libraries(cuda_mpi_tests tridcuda)
+      target_link_libraries(cuda_mpi_tests ${MPI_CXX_LIBRARIES})
+      target_include_directories(cuda_mpi_tests PRIVATE ${PROJECT_SOURCE_DIR}/include ./)
+      add_test(NAME catch_cuda_mpi_test
+        COMMAND "mpirun" -np ${MPI_TEST_NUM_PROC} $<TARGET_FILE:cuda_mpi_tests>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    endif (BUILD_MPI_TESTS)
   endif (BUILD_FOR_GPU)
 endif (BUILD_TESTING)
