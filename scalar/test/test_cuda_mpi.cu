@@ -3,6 +3,7 @@
 #include "catch_mpi_outputs.hpp"
 #include "cuda_utils.hpp"
 
+#include <trid_common.h>
 #include <trid_cuda.h>
 #include <trid_mpi_cuda.hpp>
 
@@ -116,7 +117,7 @@ void copy_strided(const AlignedArray<Float, Alignment> &src,
 }
 
 template <typename Float>
-void test_forwardX_from_file(const std::string &file_name) {
+void test_forward_from_file(const std::string &file_name) {
   // The dimension of the MPI decomposition is the same as solve_dim
   MeshLoader<Float> mesh(file_name);
 
@@ -191,11 +192,24 @@ void test_forwardX_from_file(const std::string &file_name) {
   assert(local_eq_size > 2 &&
          "One of the processes has fewer than 2 equations, this is not "
          "supported\n");
-  trid_linear_forward<Float><<<dimGrid_x, dimBlock_x>>>(
-      local_device_mesh.a().data(), local_device_mesh.b().data(),
-      local_device_mesh.c().data(), local_device_mesh.d().data(), nullptr,
-      aa_d.data(), cc_d.data(), dd_d.data(), boundaries.data(), local_eq_size,
-      local_eq_size, sys_n);
+  if (mesh.solve_dim() == 0) {
+    trid_linear_forward<Float><<<dimGrid_x, dimBlock_x>>>(
+        local_device_mesh.a().data(), local_device_mesh.b().data(),
+        local_device_mesh.c().data(), local_device_mesh.d().data(), nullptr,
+        aa_d.data(), cc_d.data(), dd_d.data(), boundaries.data(), local_eq_size,
+        local_eq_size, sys_n);
+  } else {
+    DIM_V pads, dims;
+    for (int i = 0; i < mesh.dims().size(); ++i) {
+      pads.v[i] = local_sizes[i];
+      dims.v[i] = local_sizes[i];
+    }
+    trid_strided_multidim_forward<Float><<<dimGrid_x, dimBlock_x>>>(
+        local_device_mesh.a().data(), pads, local_device_mesh.b().data(), pads,
+        local_device_mesh.c().data(), pads, local_device_mesh.d().data(), pads,
+        nullptr, pads, aa_d.data(), cc_d.data(), dd_d.data(), boundaries.data(),
+        mesh.dims().size(), mesh.solve_dim(), sys_n, dims);
+  }
 
   AlignedArray<Float, 1> boundaries_res(sys_n * 6);
   boundaries_res.resize(sys_n * 6);
@@ -238,37 +252,94 @@ void test_forwardX_from_file(const std::string &file_name) {
           dd[local_eq_size - 1];
     }
   }
+
   require_allclose(boundaries_ref, boundaries_res, sys_n * 6, 1);
 }
 
 TEST_CASE("cuda mpi: solveX", "[solvedim:0]") {
   SECTION("double") {
     SECTION("ndims: 1") {
-      test_forwardX_from_file<double>("files/one_dim_large");
+      test_forward_from_file<double>("files/one_dim_large");
     }
     SECTION("ndims: 2") {
-      test_forwardX_from_file<double>("files/two_dim_large_solve0");
+      test_forward_from_file<double>("files/two_dim_large_solve0");
     }
     SECTION("ndims: 3") {
-      test_forwardX_from_file<double>("files/three_dim_large_solve0");
+      test_forward_from_file<double>("files/three_dim_large_solve0");
     }
     SECTION("ndims: 4") {
-      test_forwardX_from_file<double>("files/four_dim_large_solve0");
+      test_forward_from_file<double>("files/four_dim_large_solve0");
     }
   }
   SECTION("float") {
     SECTION("ndims: 1") {
-      test_forwardX_from_file<float>("files/one_dim_large");
+      test_forward_from_file<float>("files/one_dim_large");
     }
     SECTION("ndims: 2") {
-      test_forwardX_from_file<float>("files/two_dim_large_solve0");
+      test_forward_from_file<float>("files/two_dim_large_solve0");
     }
     SECTION("ndims: 3") {
-      test_forwardX_from_file<float>("files/three_dim_large_solve0");
+      test_forward_from_file<float>("files/three_dim_large_solve0");
     }
     SECTION("ndims: 4") {
-      test_forwardX_from_file<float>("files/four_dim_large_solve0");
+      test_forward_from_file<float>("files/four_dim_large_solve0");
     }
   }
 }
 
+TEST_CASE("cuda mpi: solveY", "[solvedim:1]") {
+  SECTION("double") {
+    SECTION("ndims: 2") {
+      test_forward_from_file<double>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_forward_from_file<double>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_forward_from_file<double>("files/four_dim_large_solve1");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 2") {
+      test_forward_from_file<float>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_forward_from_file<float>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_forward_from_file<float>("files/four_dim_large_solve1");
+    }
+  }
+}
+
+TEST_CASE("cuda mpi: solveZ", "[solvedim:2]") {
+  SECTION("double") {
+    SECTION("ndims: 3") {
+      test_forward_from_file<double>("files/three_dim_large_solve2");
+    }
+    SECTION("ndims: 4") {
+      test_forward_from_file<double>("files/four_dim_large_solve2");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 3") {
+      test_forward_from_file<float>("files/three_dim_large_solve2");
+    }
+    SECTION("ndims: 4") {
+      test_forward_from_file<float>("files/four_dim_large_solve2");
+    }
+  }
+}
+
+TEST_CASE("cuda mpi: solve3", "[solvedim:3]") {
+  SECTION("double") {
+    SECTION("ndims: 4") {
+      test_forward_from_file<double>("files/four_dim_large_solve3");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 4") {
+      test_forward_from_file<float>("files/four_dim_large_solve3");
+    }
+  }
+}
