@@ -15,7 +15,7 @@ if (BUILD_FOR_GPU)
 	set(CUDA_LIBRARIES ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libcudart.so)
 	cuda_add_library(tridcuda ${PROJECT_SOURCE_DIR}/src/cuda/trid_cuda.cu SHARED OPTIONS -Xcompiler -fPIC) # Make binary relocatable
 
-	install(TARGETS tridcuda    
+	install(TARGETS tridcuda
 		      LIBRARY DESTINATION ${CMAKE_BINARY_DIR}/lib
 		      ARCHIVE DESTINATION ${CMAKE_BINARY_DIR}/lib)
 
@@ -24,4 +24,19 @@ if (BUILD_FOR_GPU)
 		            ${PROJECT_SOURCE_DIR}/include/trid_util.h 
 		            ${PROJECT_SOURCE_DIR}/include/cutil_inline.h    
 		      DESTINATION ${CMAKE_BINARY_DIR}/include)
+  if (BUILD_FOR_MPI)
+    find_package(MPI REQUIRED)
+    cuda_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+
+    cuda_add_library(tridcuda_mpi ${PROJECT_SOURCE_DIR}/src/cuda/trid_cuda_mpi.cu SHARED OPTIONS -Xcompiler -fPIC) # Make binary relocatable
+
+    target_link_libraries(tridcuda_mpi tridcuda)
+    install(TARGETS tridcuda_mpi
+            LIBRARY DESTINATION ${CMAKE_BINARY_DIR}/lib
+            ARCHIVE DESTINATION ${CMAKE_BINARY_DIR}/lib)
+
+	  install(FILES ${PROJECT_SOURCE_DIR}/include/trid_mpi_cuda.h
+		        DESTINATION ${CMAKE_BINARY_DIR}/include)
+
+  endif (BUILD_FOR_MPI)
 endif (BUILD_FOR_GPU)

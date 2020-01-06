@@ -38,7 +38,9 @@
 
 #include "math.h"
 #include "trid_simd.h"
+#include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <mpi.h>
 #include <vector>
 

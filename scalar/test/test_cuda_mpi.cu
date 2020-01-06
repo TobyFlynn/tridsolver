@@ -7,7 +7,7 @@
 #include <trid_cuda.h>
 #include <trid_mpi_cuda.hpp>
 
-#include <trid_mpi_cpu.hpp>
+// #include <trid_mpi_cpu.hpp>
 
 #include <mpi.h>
 
@@ -57,8 +57,9 @@ void require_allclose(const AlignedArray<Float, Align> &expected,
 
 template <typename Float>
 void require_allclose(const Float *expected, const Float *actual, size_t N,
-                      int stride = 1) {
+                      int stride = 1, std::string value = "") {
   for (size_t j = 0, i = 0; j < N; ++j, i += stride) {
+    CAPTURE(value);
     CAPTURE(i);
     CAPTURE(expected[i]);
     CAPTURE(actual[i]);
@@ -117,7 +118,7 @@ void copy_strided(const AlignedArray<Float, Alignment> &src,
 }
 
 template <typename Float>
-void test_forward_from_file(const std::string &file_name) {
+void test_manual_from_file(const std::string &file_name) {
   // The dimension of the MPI decomposition is the same as solve_dim
   MeshLoader<Float> mesh(file_name);
 
@@ -128,12 +129,12 @@ void test_forward_from_file(const std::string &file_name) {
   // Representation is column major: 0th dimension is the consecutive one
   const int eq_stride =
       std::accumulate(mesh.dims().data(), mesh.dims().data() + mesh.solve_dim(),
-                      1, std::multiplies<int>{});
+                      1, std::multiplies<int>());
   // The product of the sizes along the dimensions higher than solve_dim; needed
   // for the iteration later
   const int outer_size = std::accumulate(
       mesh.dims().data() + mesh.solve_dim() + 1,
-      mesh.dims().data() + mesh.dims().size(), 1, std::multiplies<int>{});
+      mesh.dims().data() + mesh.dims().size(), 1, std::multiplies<int>());
   const size_t eq_size = mesh.dims()[mesh.solve_dim()];
   // The number of systems to solve
   const int sys_n = eq_stride * outer_size;
@@ -217,6 +218,15 @@ void test_forward_from_file(const std::string &file_name) {
              sizeof(Float) * 6 * sys_n, cudaMemcpyDeviceToHost);
 
   // ref
+  std::vector<Float> aa_h(domain_size), cc_h(domain_size), dd_h(domain_size);
+  cudaMemcpy(aa_h.data(), aa_d.data(), sizeof(Float) * domain_size,
+             cudaMemcpyDeviceToHost);
+  cudaMemcpy(cc_h.data(), cc_d.data(), sizeof(Float) * domain_size,
+             cudaMemcpyDeviceToHost);
+  cudaMemcpy(dd_h.data(), dd_d.data(), sizeof(Float) * domain_size,
+             cudaMemcpyDeviceToHost);
+  std::vector<Float> aa_ref(domain_size), cc_ref(domain_size), dd_ref(domain_size);
+
   std::vector<Float> aa(local_eq_size), cc(local_eq_size), dd(local_eq_size);
   AlignedArray<Float, 1> boundaries_ref(sys_n * 6);
   boundaries_ref.resize(sys_n * 6);
@@ -250,96 +260,299 @@ void test_forward_from_file(const std::string &file_name) {
       boundaries_ref[(outer_ind * eq_stride + local_eq_start) * 6 + 4] = dd[0];
       boundaries_ref[(outer_ind * eq_stride + local_eq_start) * 6 + 5] =
           dd[local_eq_size - 1];
+      for (int i = 0; i < aa.size(); ++i) {
+        aa_ref[(outer_ind * local_eq_size * eq_stride + local_eq_start) +
+               i * eq_stride] = aa[i];
+        cc_ref[(outer_ind * local_eq_size * eq_stride + local_eq_start) +
+               i * eq_stride] = cc[i];
+        dd_ref[(outer_ind * local_eq_size * eq_stride + local_eq_start) +
+               i * eq_stride] = dd[i];
+      }
     }
   }
-
+  // test the results of the forward run
   require_allclose(boundaries_ref, boundaries_res, sys_n * 6, 1);
+  require_allclose(aa_ref.data(), aa_h.data(), domain_size, 1, "aa");
+  require_allclose(cc_ref.data(), cc_h.data(), domain_size, 1, "cc");
+  require_allclose(dd_ref.data(), dd_h.data(), domain_size, 1, "dd");
+  // test thomas on reduced
+  const int comm_buff_size = 6 * sys_n;
+  std::vector<Float> receive_buf(comm_buff_size * num_proc);
+  MPI_Allgather(boundaries_res.data(), comm_buff_size,
+                ToMpiDatatype<Float>::value, receive_buf.data(), comm_buff_size,
+                ToMpiDatatype<Float>::value, MPI_COMM_WORLD);
+  thomas_on_reduced_batched(receive_buf.data(), boundaries_res.data(), sys_n,
+                            num_proc, rank);
+
+  cudaMemcpy(boundaries.data(), boundaries_res.data(), sizeof(Float) * 2 * sys_n,
+             cudaMemcpyHostToDevice);
+  if (mesh.solve_dim() == 0) {
+    trid_linear_backward<Float><<<dimGrid_x, dimBlock_x>>>(
+        aa_d.data(), cc_d.data(), dd_d.data(), local_device_mesh.d().data(),
+        nullptr, boundaries.data(), local_eq_size, local_eq_size, sys_n);
+  } else {
+    DIM_V pads, dims;
+    for (int i = 0; i < mesh.dims().size(); ++i) {
+      pads.v[i] = local_sizes[i];
+      dims.v[i] = local_sizes[i];
+    }
+    trid_strided_multidim_backward<Float><<<dimGrid_x, dimBlock_x>>>(
+        aa_d.data(), pads, cc_d.data(), pads, dd_d.data(),
+        local_device_mesh.d().data(), pads, nullptr, pads, boundaries.data(),
+        mesh.dims().size(), mesh.solve_dim(), sys_n, dims);
+  }
+
+  cudaMemcpy(d_host.data(), local_device_mesh.d().data(), sizeof(Float) * domain_size,
+             cudaMemcpyDeviceToHost);
+  require_allclose(u_host.data(), d_host.data(), domain_size, 1, "result");
 }
 
-TEST_CASE("cuda mpi: solveX", "[solvedim:0]") {
+template <typename Float>
+void test_solver_from_file(const std::string &file_name) {
+  // The dimension of the MPI decomposition is the same as solve_dim
+  MeshLoader<Float> mesh(file_name);
+
+  int num_proc, rank;
+  MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  // Create rectangular grid
+  std::vector<int> sides(mesh.dims().size(), 0);
+  MPI_Dims_create(num_proc, mesh.dims().size(), sides.data());
+
+  // Create communicator for grid
+  MPI_Comm cart_comm;
+  std::vector<int> mpi_dims(mesh.dims().size()), periods(mesh.dims().size());
+  for (size_t i = 0; i < mesh.dims().size(); ++i) {
+    mpi_dims[i] = sides[i];
+    periods[i] = 0;
+  }
+  MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size(), mpi_dims.data(),
+                  periods.data(), 0, &cart_comm);
+  int cart_rank;
+  MPI_Comm_rank(cart_comm, &cart_rank);
+  std::vector<int> coords(mesh.dims().size());
+  MPI_Cart_coords(cart_comm, cart_rank, coords.size(), coords.data());
+
+  // The size of the local domain.
+  std::vector<int> local_sizes(mesh.dims().size());
+  // The starting indices of the local domain in each dimension.
+  std::vector<int> domain_offsets(mesh.dims().size());
+  // The strides in the mesh for each dimension.
+  std::vector<int> global_strides(mesh.dims().size());
+  int domain_size = 1;
+  for (size_t i = 0; i < local_sizes.size(); ++i) {
+    const int global_dim = mesh.dims()[i];
+    domain_offsets[i] = coords[i] * (global_dim / mpi_dims[i]);
+    local_sizes[i] = coords[i] == mpi_dims[i] - 1
+                         ? global_dim - domain_offsets[i]
+                         : global_dim / mpi_dims[i];
+    global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
+    domain_size *= local_sizes[i];
+  }
+
+  MpiSolverParams params(cart_comm, mesh.dims().size(), local_sizes.data(),
+                         mesh.solve_dim(), mpi_dims.data());
+
+  // Simulate distributed environment: only load our data
+  AlignedArray<Float, 1> a(domain_size), b(domain_size), c(domain_size),
+      u(domain_size), d(domain_size);
+  copy_strided(mesh.a(), a, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.b(), b, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.c(), c, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.d(), d, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+  copy_strided(mesh.u(), u, local_sizes, domain_offsets, global_strides,
+               local_sizes.size() - 1);
+
+  GPUMesh<Float> local_device_mesh(a, b, c, d, local_sizes);
+
+  // Solve the equations
+  tridMultiDimBatchSolveMPI<Float>(
+      params, local_device_mesh.a().data(), local_device_mesh.b().data(),
+      local_device_mesh.c().data(), local_device_mesh.d().data(), nullptr,
+      local_sizes.data());
+
+  // Check result
+  cudaMemcpy(d.data(), local_device_mesh.d().data(),
+             sizeof(Float) * domain_size, cudaMemcpyDeviceToHost);
+
+  require_allclose(u, d, domain_size, 1);
+}
+
+TEST_CASE("cuda manual mpi: solveX", "[manual][solvedim:0]") {
   SECTION("double") {
     SECTION("ndims: 1") {
-      test_forward_from_file<double>("files/one_dim_large");
+      test_manual_from_file<double>("files/one_dim_large");
     }
     SECTION("ndims: 2") {
-      test_forward_from_file<double>("files/two_dim_large_solve0");
+      test_manual_from_file<double>("files/two_dim_large_solve0");
     }
     SECTION("ndims: 3") {
-      test_forward_from_file<double>("files/three_dim_large_solve0");
+      test_manual_from_file<double>("files/three_dim_large_solve0");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<double>("files/four_dim_large_solve0");
+      test_manual_from_file<double>("files/four_dim_large_solve0");
     }
   }
   SECTION("float") {
     SECTION("ndims: 1") {
-      test_forward_from_file<float>("files/one_dim_large");
+      test_manual_from_file<float>("files/one_dim_large");
     }
     SECTION("ndims: 2") {
-      test_forward_from_file<float>("files/two_dim_large_solve0");
+      test_manual_from_file<float>("files/two_dim_large_solve0");
     }
     SECTION("ndims: 3") {
-      test_forward_from_file<float>("files/three_dim_large_solve0");
+      test_manual_from_file<float>("files/three_dim_large_solve0");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<float>("files/four_dim_large_solve0");
+      test_manual_from_file<float>("files/four_dim_large_solve0");
     }
   }
 }
 
-TEST_CASE("cuda mpi: solveY", "[solvedim:1]") {
+TEST_CASE("cuda manual mpi: solveY", "[manual][solvedim:1]") {
   SECTION("double") {
     SECTION("ndims: 2") {
-      test_forward_from_file<double>("files/two_dim_large_solve1");
+      test_manual_from_file<double>("files/two_dim_large_solve1");
     }
     SECTION("ndims: 3") {
-      test_forward_from_file<double>("files/three_dim_large_solve1");
+      test_manual_from_file<double>("files/three_dim_large_solve1");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<double>("files/four_dim_large_solve1");
+      test_manual_from_file<double>("files/four_dim_large_solve1");
     }
   }
   SECTION("float") {
     SECTION("ndims: 2") {
-      test_forward_from_file<float>("files/two_dim_large_solve1");
+      test_manual_from_file<float>("files/two_dim_large_solve1");
     }
     SECTION("ndims: 3") {
-      test_forward_from_file<float>("files/three_dim_large_solve1");
+      test_manual_from_file<float>("files/three_dim_large_solve1");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<float>("files/four_dim_large_solve1");
+      test_manual_from_file<float>("files/four_dim_large_solve1");
     }
   }
 }
 
-TEST_CASE("cuda mpi: solveZ", "[solvedim:2]") {
+TEST_CASE("cuda manual mpi: solveZ", "[manual][solvedim:2]") {
   SECTION("double") {
     SECTION("ndims: 3") {
-      test_forward_from_file<double>("files/three_dim_large_solve2");
+      test_manual_from_file<double>("files/three_dim_large_solve2");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<double>("files/four_dim_large_solve2");
+      test_manual_from_file<double>("files/four_dim_large_solve2");
     }
   }
   SECTION("float") {
     SECTION("ndims: 3") {
-      test_forward_from_file<float>("files/three_dim_large_solve2");
+      test_manual_from_file<float>("files/three_dim_large_solve2");
     }
     SECTION("ndims: 4") {
-      test_forward_from_file<float>("files/four_dim_large_solve2");
+      test_manual_from_file<float>("files/four_dim_large_solve2");
     }
   }
 }
 
-TEST_CASE("cuda mpi: solve3", "[solvedim:3]") {
+TEST_CASE("cuda manual mpi: solve3", "[manual][solvedim:3]") {
   SECTION("double") {
     SECTION("ndims: 4") {
-      test_forward_from_file<double>("files/four_dim_large_solve3");
+      test_manual_from_file<double>("files/four_dim_large_solve3");
     }
   }
   SECTION("float") {
     SECTION("ndims: 4") {
-      test_forward_from_file<float>("files/four_dim_large_solve3");
+      test_manual_from_file<float>("files/four_dim_large_solve3");
+    }
+  }
+}
+
+TEST_CASE("cuda solver mpi: solveX", "[solver][solvedim:0]") {
+  SECTION("double") {
+    SECTION("ndims: 1") {
+      test_solver_from_file<double>("files/one_dim_large");
+    }
+    SECTION("ndims: 2") {
+      test_solver_from_file<double>("files/two_dim_large_solve0");
+    }
+    SECTION("ndims: 3") {
+      test_solver_from_file<double>("files/three_dim_large_solve0");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<double>("files/four_dim_large_solve0");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 1") { test_solver_from_file<float>("files/one_dim_large"); }
+    SECTION("ndims: 2") {
+      test_solver_from_file<float>("files/two_dim_large_solve0");
+    }
+    SECTION("ndims: 3") {
+      test_solver_from_file<float>("files/three_dim_large_solve0");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<float>("files/four_dim_large_solve0");
+    }
+  }
+}
+
+TEST_CASE("cuda solver mpi: solveY", "[solver][solvedim:1]") {
+  SECTION("double") {
+    SECTION("ndims: 2") {
+      test_solver_from_file<double>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_solver_from_file<double>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<double>("files/four_dim_large_solve1");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 2") {
+      test_solver_from_file<float>("files/two_dim_large_solve1");
+    }
+    SECTION("ndims: 3") {
+      test_solver_from_file<float>("files/three_dim_large_solve1");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<float>("files/four_dim_large_solve1");
+    }
+  }
+}
+
+TEST_CASE("cuda solver mpi: solveZ", "[solver][solvedim:2]") {
+  SECTION("double") {
+    SECTION("ndims: 3") {
+      test_solver_from_file<double>("files/three_dim_large_solve2");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<double>("files/four_dim_large_solve2");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 3") {
+      test_solver_from_file<float>("files/three_dim_large_solve2");
+    }
+    SECTION("ndims: 4") {
+      test_solver_from_file<float>("files/four_dim_large_solve2");
+    }
+  }
+}
+
+TEST_CASE("cuda solver mpi: solve3", "[solver][solvedim:3]") {
+  SECTION("double") {
+    SECTION("ndims: 4") {
+      test_solver_from_file<double>("files/four_dim_large_solve3");
+    }
+  }
+  SECTION("float") {
+    SECTION("ndims: 4") {
+      test_solver_from_file<float>("files/four_dim_large_solve3");
     }
   }
 }

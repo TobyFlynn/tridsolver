@@ -37,7 +37,7 @@ public:
   const DeviceArray<Float> &a() const { return _a; }
   const DeviceArray<Float> &b() const { return _b; }
   const DeviceArray<Float> &c() const { return _c; }
-  DeviceArray<Float> d() const { return _d; }
+  DeviceArray<Float> &d() { return _d; }
 };
 
 /**********************************************************************

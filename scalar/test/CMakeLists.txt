@@ -74,7 +74,7 @@ if (BUILD_TESTING)
       cuda_add_executable(cuda_mpi_tests catch_mpi_main.cpp test_cuda_mpi.cu)
       cuda_add_cublas_to_target(cuda_mpi_tests)
       target_link_libraries(cuda_mpi_tests Catch)
-      target_link_libraries(cuda_mpi_tests tridcuda)
+      target_link_libraries(cuda_mpi_tests tridcuda_mpi)
       target_link_libraries(cuda_mpi_tests ${MPI_CXX_LIBRARIES})
       target_include_directories(cuda_mpi_tests PRIVATE ${PROJECT_SOURCE_DIR}/include ./)
       add_test(NAME catch_cuda_mpi_test
