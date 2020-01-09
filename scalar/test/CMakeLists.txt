@@ -64,7 +64,6 @@ if (BUILD_TESTING)
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
     if (BUILD_MPI_TESTS)
-      find_package(CUDA REQUIRED)
       include(FindCUDA)
       set(MPI_TEST_NUM_PROC "2" CACHE STRING
         "The number of processes to launch in MPI tests.")

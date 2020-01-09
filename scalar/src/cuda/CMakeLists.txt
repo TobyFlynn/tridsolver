@@ -26,9 +26,10 @@ if (BUILD_FOR_GPU)
 		      DESTINATION ${CMAKE_BINARY_DIR}/include)
   if (BUILD_FOR_MPI)
     find_package(MPI REQUIRED)
+    find_package(OpenMP REQUIRED)
     cuda_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 
-    cuda_add_library(tridcuda_mpi ${PROJECT_SOURCE_DIR}/src/cuda/trid_cuda_mpi.cu SHARED OPTIONS -Xcompiler -fPIC) # Make binary relocatable
+    cuda_add_library(tridcuda_mpi ${PROJECT_SOURCE_DIR}/src/cuda/trid_cuda_mpi.cu SHARED OPTIONS -Xcompiler -fPIC -Xcompiler ${OpenMP_CXX_FLAGS}) # Make binary relocatable
 
     target_link_libraries(tridcuda_mpi tridcuda)
     install(TARGETS tridcuda_mpi

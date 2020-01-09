@@ -187,22 +187,15 @@ void test_solver_from_file(const std::string &file_name) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   // Create rectangular grid
-  std::vector<int> sides(mesh.dims().size(), 0);
-  MPI_Dims_create(num_proc, mesh.dims().size(), sides.data());
+  std::vector<int> mpi_dims(mesh.dims().size()), periods(mesh.dims().size(), 0);
+  MPI_Dims_create(num_proc, mesh.dims().size(), mpi_dims.data());
 
   // Create communicator for grid
   MPI_Comm cart_comm;
-  std::vector<int> mpi_dims(mesh.dims().size()), periods(mesh.dims().size());
-  for (size_t i = 0; i < mesh.dims().size(); ++i) {
-    mpi_dims[i] = sides[i];
-    periods[i] = 0;
-  }
   MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size(), mpi_dims.data(),
                   periods.data(), 0, &cart_comm);
-  int cart_rank;
-  MPI_Comm_rank(cart_comm, &cart_rank);
-  std::vector<int> coords(mesh.dims().size());
-  MPI_Cart_coords(cart_comm, cart_rank, coords.size(), coords.data());
+
+  MpiSolverParams params(cart_comm, mesh.dims().size(), mpi_dims.data());
 
   // The size of the local domain.
   std::vector<int> local_sizes(mesh.dims().size());
@@ -213,16 +206,13 @@ void test_solver_from_file(const std::string &file_name) {
   int domain_size = 1;
   for (size_t i = 0; i < local_sizes.size(); ++i) {
     const int global_dim = mesh.dims()[i];
-    domain_offsets[i] = coords[i] * (global_dim / mpi_dims[i]);
-    local_sizes[i] = coords[i] == mpi_dims[i] - 1
+    domain_offsets[i] = params.mpi_coords[i] * (global_dim / mpi_dims[i]);
+    local_sizes[i] = params.mpi_coords[i] == mpi_dims[i] - 1
                          ? global_dim - domain_offsets[i]
                          : global_dim / mpi_dims[i];
     global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
     domain_size *= local_sizes[i];
   }
-
-  MpiSolverParams params(cart_comm, mesh.dims().size(), local_sizes.data(),
-                         mesh.solve_dim(), mpi_dims.data());
 
   // Simulate distributed environment: only load our data
   AlignedArray<Float, 1> a(domain_size), b(domain_size), c(domain_size),
@@ -239,7 +229,8 @@ void test_solver_from_file(const std::string &file_name) {
                local_sizes.size() - 1);
 
   // Solve the equations
-  trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data());
+  trid_solve_mpi(params, a.data(), b.data(), c.data(), d.data(),
+                 mesh.dims().size(), mesh.solve_dim(), local_sizes.data());
 
   // Check result
   require_allclose(u, d, domain_size, 1);

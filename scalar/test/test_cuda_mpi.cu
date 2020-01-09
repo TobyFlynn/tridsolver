@@ -2,12 +2,15 @@
 #include "catch.hpp"
 #include "catch_mpi_outputs.hpp"
 #include "cuda_utils.hpp"
+#include "cuda_mpi_wrappers.hpp"
 
 #include <trid_common.h>
 #include <trid_cuda.h>
 #include <trid_mpi_cuda.hpp>
+#include <trid_mpi_cpu.hpp>
 
-// #include <trid_mpi_cpu.hpp>
+#include "../src/cuda/trid_strided_multidim_mpi.hpp"
+#include "../src/cuda/trid_linear_mpi.hpp"
 
 #include <mpi.h>
 
@@ -117,6 +120,10 @@ void copy_strided(const AlignedArray<Float, Alignment> &src,
   }
 }
 
+template <typename REAL>
+void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
+                               int sys_n, int num_proc, int mpi_coord);
+
 template <typename Float>
 void test_manual_from_file(const std::string &file_name) {
   // The dimension of the MPI decomposition is the same as solve_dim
@@ -145,7 +152,7 @@ void test_manual_from_file(const std::string &file_name) {
   const size_t local_eq_size =
       rank == num_proc - 1 ? eq_size - mpi_domain_offset : eq_size / num_proc;
 
-  /* Move data of the current rank to GPU*/
+  /* Move data of the current rank to GPU */
   // Simulate distributed environment: only load our data
   const size_t domain_size = sys_n * local_eq_size;
   AlignedArray<Float, 1> a_host(domain_size), b_host(domain_size),
@@ -317,22 +324,17 @@ void test_solver_from_file(const std::string &file_name) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   // Create rectangular grid
-  std::vector<int> sides(mesh.dims().size(), 0);
-  MPI_Dims_create(num_proc, mesh.dims().size(), sides.data());
+  std::vector<int> mpi_dims(mesh.dims().size(), 0);
+  MPI_Dims_create(num_proc, mesh.dims().size(), mpi_dims.data());
 
   // Create communicator for grid
   MPI_Comm cart_comm;
-  std::vector<int> mpi_dims(mesh.dims().size()), periods(mesh.dims().size());
-  for (size_t i = 0; i < mesh.dims().size(); ++i) {
-    mpi_dims[i] = sides[i];
-    periods[i] = 0;
-  }
+  std::vector<int> periods(mesh.dims().size(), 0);
+
   MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size(), mpi_dims.data(),
                   periods.data(), 0, &cart_comm);
-  int cart_rank;
-  MPI_Comm_rank(cart_comm, &cart_rank);
-  std::vector<int> coords(mesh.dims().size());
-  MPI_Cart_coords(cart_comm, cart_rank, coords.size(), coords.data());
+
+  MpiSolverParams params(cart_comm, mesh.dims().size(), mpi_dims.data());
 
   // The size of the local domain.
   std::vector<int> local_sizes(mesh.dims().size());
@@ -343,16 +345,13 @@ void test_solver_from_file(const std::string &file_name) {
   int domain_size = 1;
   for (size_t i = 0; i < local_sizes.size(); ++i) {
     const int global_dim = mesh.dims()[i];
-    domain_offsets[i] = coords[i] * (global_dim / mpi_dims[i]);
-    local_sizes[i] = coords[i] == mpi_dims[i] - 1
+    domain_offsets[i] = params.mpi_coords[i] * (global_dim / mpi_dims[i]);
+    local_sizes[i] = params.mpi_coords[i] == mpi_dims[i] - 1
                          ? global_dim - domain_offsets[i]
                          : global_dim / mpi_dims[i];
     global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
     domain_size *= local_sizes[i];
   }
-
-  MpiSolverParams params(cart_comm, mesh.dims().size(), local_sizes.data(),
-                         mesh.solve_dim(), mpi_dims.data());
 
   // Simulate distributed environment: only load our data
   AlignedArray<Float, 1> a(domain_size), b(domain_size), c(domain_size),
@@ -371,9 +370,10 @@ void test_solver_from_file(const std::string &file_name) {
   GPUMesh<Float> local_device_mesh(a, b, c, d, local_sizes);
 
   // Solve the equations
-  tridMultiDimBatchSolveMPI<Float>(
+  tridmtsvStridedBatchMPIWrapper<Float>(
       params, local_device_mesh.a().data(), local_device_mesh.b().data(),
       local_device_mesh.c().data(), local_device_mesh.d().data(), nullptr,
+      local_sizes.data(), local_sizes.size(), mesh.solve_dim(),
       local_sizes.data());
 
   // Check result

@@ -38,6 +38,7 @@
 
 #include "math.h"
 #include "trid_simd.h"
+#include "trid_mpi_solver_params.hpp"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -154,64 +155,6 @@ inline void thomas_backward(const REAL *__restrict__ aa,
   d[(N - 1) * stride] = dd[N - 1];
 }
 
-struct MpiSolverParams {
-  // Communicator that includes every node calculating the same set of
-  // equations as the current node.
-  MPI_Comm communicator;
-  // The size of the local domain; must be a `num_dims` large array. It won't be
-  // owned.
-  const int *size;
-  // The number of MPI processes in each dimension. It is `num_dims` large. It
-  // won't be owned.
-  const int *num_mpi_procs;
-  // The number of dimensions in the mesh.
-  int num_dims;
-  // The index of the dimension along which the equations are defined.
-  int equation_dim;
-  // The MPI coordinate of the current process along the dimension of the
-  // equations.
-  int mpi_coord;
-
-  // Assumes that the number
-  MpiSolverParams(MPI_Comm cartesian_communicator, int num_dims_,
-                  const int *size_, int equation_dim_,
-                  const int *num_mpi_procs_)
-      : size{size_}, num_mpi_procs{num_mpi_procs_}, num_dims{num_dims_},
-        equation_dim{equation_dim_} {
-    int cart_rank;
-    MPI_Comm_rank(cartesian_communicator, &cart_rank);
-    std::vector<int> coords(num_dims_);
-    MPI_Cart_coords(cartesian_communicator, cart_rank, num_dims_,
-                    coords.data());
-    std::vector<int> neighbours = {cart_rank};
-    this->mpi_coord = coords[equation_dim];
-    // Collect the processes in the same row/column
-    for (int i = 1;
-         i <= std::max(num_mpi_procs[equation_dim] - mpi_coord - 1, mpi_coord);
-         ++i) {
-      int prev, next;
-      MPI_Cart_shift(cartesian_communicator, equation_dim, i, &prev, &next);
-      if (i <= mpi_coord) {
-        neighbours.push_back(prev);
-      }
-      if (i + mpi_coord < num_mpi_procs[equation_dim]) {
-        neighbours.push_back(next);
-      }
-    }
-    // This is needed, otherwise the communications hang
-    std::sort(neighbours.begin(), neighbours.end());
-
-    // Create new communicator for neighbours
-    MPI_Group cart_group;
-    MPI_Comm_group(cartesian_communicator, &cart_group);
-    MPI_Group neighbours_group;
-    MPI_Group_incl(cart_group, neighbours.size(), neighbours.data(),
-                   &neighbours_group);
-    MPI_Comm_create(cartesian_communicator, neighbours_group,
-                    &this->communicator);
-  }
-};
-
 //
 // MPI solver
 //
@@ -224,24 +167,25 @@ struct MpiSolverParams {
 // domain_decomposition_dim`).
 template <typename REAL>
 inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
-                           const REAL *b, const REAL *c, REAL *d) {
-  assert(params.equation_dim < params.num_dims);
+                           const REAL *b, const REAL *c, REAL *d, int ndim,
+                           int solvedim, int *dims) {
+  assert(solvedim < ndim);
   assert((
       (std::is_same<REAL, float>::value || std::is_same<REAL, double>::value) &&
       "trid_solve_mpi: only double or float values are supported"));
 
   int eq_stride = 1;
-  for (size_t i = 0; i < params.equation_dim; ++i) {
-    eq_stride *= params.size[i];
+  for (int i = 0; i < solvedim; ++i) {
+    eq_stride *= dims[i];
   }
   // The product of the sizes along the dimensions higher than solve_dim; needed
   // for the iteration later
   int outer_size = 1;
-  for (size_t i = params.equation_dim + 1; i < params.num_dims; ++i) {
-    outer_size *= params.size[i];
+  for (int i = solvedim + 1; i < ndim; ++i) {
+    outer_size *= dims[i];
   }
   // The size of the equations / our domain
-  const size_t local_eq_size = params.size[params.equation_dim];
+  const size_t local_eq_size = dims[solvedim];
 
   const MPI_Datatype real_datatype =
       std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
@@ -253,7 +197,7 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = 6 * outer_size * eq_stride;
   std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(comm_buf_size * params.num_mpi_procs[params.equation_dim]);
+      receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
 
   // Calculation
   // Forward pass
@@ -296,7 +240,7 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
   // Communicate boundary results
   MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                 receive_buf.data(), comm_buf_size, real_datatype,
-                params.communicator);
+                params.communicators[solvedim]);
 
   // Reduced system and backward pass
   for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
@@ -315,13 +259,13 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
           (outer_ind * eq_stride + local_eq_start) * local_eq_size;
 
       // Reduced system
-      std::vector<REAL> aa_r(2 * params.num_mpi_procs[params.equation_dim]),
-          cc_r(2 * params.num_mpi_procs[params.equation_dim]),
-          dd_r(2 * params.num_mpi_procs[params.equation_dim]);
+      std::vector<REAL> aa_r(2 * params.num_mpi_procs[solvedim]),
+          cc_r(2 * params.num_mpi_procs[solvedim]),
+          dd_r(2 * params.num_mpi_procs[solvedim]);
       // The offset in the send and receive buffers
       const size_t comm_buf_offset =
           (outer_ind * eq_stride + local_eq_start) * 6;
-      for (int i = 0; i < params.num_mpi_procs[params.equation_dim]; ++i) {
+      for (int i = 0; i < params.num_mpi_procs[solvedim]; ++i) {
         aa_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 0];
         aa_r[2 * i + 1] = receive_buf[comm_buf_size * i + comm_buf_offset + 1];
         cc_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 2];
@@ -333,11 +277,11 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
       // indexing of cc_r, dd_r starts from 0
       // while indexing of aa_r starts from 1
       thomas_on_reduced<REAL>(aa_r.data(), cc_r.data(), dd_r.data(),
-                              2 * params.num_mpi_procs[params.equation_dim], 1);
+                              2 * params.num_mpi_procs[solvedim], 1);
 
-      dd[local_array_offset + 0] = dd_r[2 * params.mpi_coord];
+      dd[local_array_offset + 0] = dd_r[2 * params.mpi_coords[solvedim]];
       dd[local_array_offset + local_eq_size - 1] =
-          dd_r[2 * params.mpi_coord + 1];
+          dd_r[2 * params.mpi_coords[solvedim] + 1];
       thomas_backward<REAL>(aa.data() + local_array_offset,
                             cc.data() + local_array_offset,
                             dd.data() + local_array_offset, d + equation_offset,
