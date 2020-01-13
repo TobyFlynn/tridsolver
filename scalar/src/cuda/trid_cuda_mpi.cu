@@ -184,7 +184,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 template <typename REAL>
 void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                const REAL *b, const REAL *c, REAL *d, REAL *u,
-                               int *pads, int ndim, int solvedim, int *dims) {
+                               int ndim, int solvedim, int *dims, int *pads) {
   tridMultiDimBatchSolveMPI<REAL>(params, a, pads, b, pads, c, pads, d, pads, u,
                                   pads, ndim, solvedim, dims);
 }
@@ -193,10 +193,10 @@ EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
                                       const double *c, double *d, double *u,
-                                      int *pads, int ndim, int solvedim,
-                                      int *dims) {
-  tridMultiDimBatchSolveMPI<double>(params, a, b, c, d, u, pads, ndim, solvedim,
-                                    dims);
+                                      int ndim, int solvedim, int *dims,
+                                      int *pads) {
+  tridMultiDimBatchSolveMPI<double>(params, a, b, c, d, u, ndim, solvedim, dims,
+                                    pads);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -204,10 +204,10 @@ EXTERN_C
 tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
                                       const float *c, float *d, float *u,
-                                      int *pads, int ndim, int solvedim,
-                                      int *dims) {
-  tridMultiDimBatchSolveMPI<float>(params, a, b, c, d, u, pads, ndim, solvedim,
-                                   dims);
+                                      int ndim, int solvedim, int *dims,
+                                      int *pads) {
+  tridMultiDimBatchSolveMPI<float>(params, a, b, c, d, u, ndim, solvedim, dims,
+                                   pads);
   return TRID_STATUS_SUCCESS;
 }
 

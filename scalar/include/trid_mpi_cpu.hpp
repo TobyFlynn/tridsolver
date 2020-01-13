@@ -201,12 +201,12 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
 
   // Calculation
   // Forward pass
-  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+  for (int outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
     // Start of the domain for the slice defined by `outer_ind` in the global
     // mesh along the dimension of the decomposition. (Note: the arrays only
     // contain the local data.)
     const size_t domain_start = outer_ind * local_eq_size * eq_stride;
-    for (size_t local_eq_start = 0; local_eq_start < eq_stride;
+    for (int local_eq_start = 0; local_eq_start < eq_stride;
          ++local_eq_start) {
       // The offset in the coefficient arrays a, b, c and d
       const size_t equation_offset = domain_start + local_eq_start;
@@ -243,12 +243,12 @@ inline void trid_solve_mpi(const MpiSolverParams &params, const REAL *a,
                 params.communicators[solvedim]);
 
   // Reduced system and backward pass
-  for (size_t outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
+  for (int outer_ind = 0; outer_ind < outer_size; ++outer_ind) {
     // Start of the domain for the slice defined by `outer_ind` in the global
     // mesh along the dimension of the decomposition. (Note: the arrays only
     // contain the local data.)
     const size_t domain_start = outer_ind * local_eq_size * eq_stride;
-    for (size_t local_eq_start = 0; local_eq_start < eq_stride;
+    for (int local_eq_start = 0; local_eq_start < eq_stride;
          ++local_eq_start) {
       // The offset in the coefficient arrays a, b, c and d
       const size_t equation_offset = domain_start + local_eq_start;

@@ -7,7 +7,7 @@ if (BUILD_FOR_GPU)
 	set(CUDA_64_BIT_DEVICE_CODE ON) # -m64 compiler option
 	set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-	set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS}         -arch=sm_35 -gencode arch=compute_60,code=sm_60 --ptxas-options=-v -Xptxas -dlcm=cg ")
+	set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS}         -arch=sm_35 -gencode arch=compute_60,code=sm_60 -Xptxas -dlcm=cg ")
 	set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG}   -g -G -O0 -ftz=false -fmad=false                ")
 	set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE} -O3                                             ")
 
