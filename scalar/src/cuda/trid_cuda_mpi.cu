@@ -81,7 +81,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   }
 }
 
-template <typename REAL>
+template <typename REAL, int INC>
 void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                int *a_pads, const REAL *b, int *b_pads,
                                const REAL *c, int *c_pads, REAL *d, int *d_pads,
@@ -129,7 +129,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   dim3 dimBlock_x(blockdimx, blockdimy);
   if (solvedim == 0) {
     trid_linear_forward<REAL>
-        <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, u, aa, cc, dd, boundaries,
+        <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
                                     local_eq_size, local_eq_size, sys_n);
   } else {
     DIM_V pads, dims; // TODO
@@ -138,7 +138,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       dims.v[i] = a_pads[i];
     }
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
-        a, pads, b, pads, c, pads, d, pads, u, pads, aa, cc, dd, boundaries,
+        a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
         ndim, solvedim, sys_n, dims);
   }
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
@@ -162,7 +162,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
              cudaMemcpyHostToDevice);
 
   if (solvedim == 0) {
-    trid_linear_backward<REAL><<<dimGrid_x, dimBlock_x>>>(
+    trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
         aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
   } else {
     DIM_V pads, dims; // TODO
@@ -170,7 +170,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       pads.v[i] = a_pads[i];
       dims.v[i] = a_pads[i];
     }
-    trid_strided_multidim_backward<REAL>
+    trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
                                     boundaries, ndim, solvedim, sys_n, dims);
   }
@@ -181,12 +181,12 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaFree(boundaries);
 }
 
-template <typename REAL>
+template <typename REAL, int INC>
 void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                const REAL *b, const REAL *c, REAL *d, REAL *u,
                                int ndim, int solvedim, int *dims, int *pads) {
-  tridMultiDimBatchSolveMPI<REAL>(params, a, pads, b, pads, c, pads, d, pads, u,
-                                  pads, ndim, solvedim, dims);
+  tridMultiDimBatchSolveMPI<REAL, INC>(params, a, pads, b, pads, c, pads, d,
+                                       pads, u, pads, ndim, solvedim, dims);
 }
 
 EXTERN_C
@@ -195,8 +195,8 @@ tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *c, double *d, double *u,
                                       int ndim, int solvedim, int *dims,
                                       int *pads) {
-  tridMultiDimBatchSolveMPI<double>(params, a, b, c, d, u, ndim, solvedim, dims,
-                                    pads);
+  tridMultiDimBatchSolveMPI<double, 0>(params, a, b, c, d, u, ndim, solvedim,
+                                       dims, pads);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -206,8 +206,30 @@ tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const float *c, float *d, float *u,
                                       int ndim, int solvedim, int *dims,
                                       int *pads) {
-  tridMultiDimBatchSolveMPI<float>(params, a, b, c, d, u, ndim, solvedim, dims,
-                                   pads);
+  tridMultiDimBatchSolveMPI<float, 0>(params, a, b, c, d, u, ndim, solvedim,
+                                      dims, pads);
+  return TRID_STATUS_SUCCESS;
+}
+
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
+                                      const double *a, const double *b,
+                                      const double *c, double *d, double *u,
+                                      int ndim, int solvedim, int *dims,
+                                      int *pads) {
+  tridMultiDimBatchSolveMPI<double, 1>(params, a, b, c, d, u, ndim, solvedim,
+                                       dims, pads);
+  return TRID_STATUS_SUCCESS;
+}
+
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
+                                      const float *a, const float *b,
+                                      const float *c, float *d, float *u,
+                                      int ndim, int solvedim, int *dims,
+                                      int *pads) {
+  tridMultiDimBatchSolveMPI<float, 1>(params, a, b, c, d, u, ndim, solvedim,
+                                      dims, pads);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -216,8 +238,9 @@ tridStatus_t tridDmtsvStridedBatchPaddedMPI(
     const MpiSolverParams &params, const double *a, int *a_pads,
     const double *b, int *b_pads, const double *c, int *c_pads, double *d,
     int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims) {
-  tridMultiDimBatchSolveMPI<double>(params, a, a_pads, b, b_pads, c, c_pads, d,
-                                    d_pads, u, u_pads, ndim, solvedim, dims);
+  tridMultiDimBatchSolveMPI<double, 0>(params, a, a_pads, b, b_pads, c, c_pads,
+                                       d, d_pads, u, u_pads, ndim, solvedim,
+                                       dims);
   return TRID_STATUS_SUCCESS;
 }
 
@@ -226,8 +249,31 @@ tridStatus_t tridSmtsvStridedBatchPaddedMPI(
     const MpiSolverParams &params, const float *a, int *a_pads, const float *b,
     int *b_pads, const float *c, int *c_pads, float *d, int *d_pads, float *u,
     int *u_pads, int ndim, int solvedim, int *dims) {
-  tridMultiDimBatchSolveMPI<float>(params, a, a_pads, b, b_pads, c, c_pads, d,
-                                   d_pads, u, u_pads, ndim, solvedim, dims);
+  tridMultiDimBatchSolveMPI<float, 0>(params, a, a_pads, b, b_pads, c, c_pads,
+                                      d, d_pads, u, u_pads, ndim, solvedim,
+                                      dims);
+  return TRID_STATUS_SUCCESS;
+}
+
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchPaddedIncMPI(
+    const MpiSolverParams &params, const double *a, int *a_pads,
+    const double *b, int *b_pads, const double *c, int *c_pads, double *d,
+    int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims) {
+  tridMultiDimBatchSolveMPI<double, 1>(params, a, a_pads, b, b_pads, c, c_pads,
+                                       d, d_pads, u, u_pads, ndim, solvedim,
+                                       dims);
+  return TRID_STATUS_SUCCESS;
+}
+
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchPaddedIncMPI(
+    const MpiSolverParams &params, const float *a, int *a_pads, const float *b,
+    int *b_pads, const float *c, int *c_pads, float *d, int *d_pads, float *u,
+    int *u_pads, int ndim, int solvedim, int *dims) {
+  tridMultiDimBatchSolveMPI<float, 1>(params, a, a_pads, b, b_pads, c, c_pads,
+                                      d, d_pads, u, u_pads, ndim, solvedim,
+                                      dims);
   return TRID_STATUS_SUCCESS;
 }
 

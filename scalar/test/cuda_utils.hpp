@@ -10,6 +10,7 @@ template <typename T> class DeviceArray {
 public:
   DeviceArray();
   DeviceArray(size_t size);
+  DeviceArray(const T* host_arr, size_t size);
   DeviceArray(const AlignedArray<T, 1> &host_arr);
   DeviceArray(const DeviceArray &);
   DeviceArray &operator=(DeviceArray);
@@ -52,10 +53,14 @@ DeviceArray<T>::DeviceArray(size_t size) : _size(size), arr_d(nullptr) {
 }
 
 template <typename T>
-DeviceArray<T>::DeviceArray(const AlignedArray<T, 1> &host_arr)
-    : DeviceArray(host_arr.size()) {
-  cudaMemcpy(arr_d, host_arr.data(), sizeof(T) * _size, cudaMemcpyHostToDevice);
+DeviceArray<T>::DeviceArray(const T *host_arr, size_t size)
+    : DeviceArray(size) {
+  cudaMemcpy(arr_d, host_arr, sizeof(T) * _size, cudaMemcpyHostToDevice);
 }
+
+template <typename T>
+DeviceArray<T>::DeviceArray(const AlignedArray<T, 1> &host_arr)
+    : DeviceArray(host_arr.data(), host_arr.size()) {}
 
 template <typename T>
 DeviceArray<T>::DeviceArray(const DeviceArray &other)

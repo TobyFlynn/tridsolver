@@ -47,10 +47,9 @@ template <typename REAL>
 __global__ void
 trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
                     const REAL *__restrict__ c, const REAL *__restrict__ d,
-                    const REAL *__restrict__ u, REAL *__restrict__ aa,
-                    REAL *__restrict__ cc, REAL *__restrict__ dd,
-                    REAL *__restrict__ boundaries, int sys_size, int sys_pads,
-                    int sys_n) {
+                    REAL *__restrict__ aa, REAL *__restrict__ cc,
+                    REAL *__restrict__ dd, REAL *__restrict__ boundaries,
+                    int sys_size, int sys_pads, int sys_n) {
 
   REAL bb;
   int i;
@@ -109,7 +108,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
 //
 // Modified Thomas backward pass
 //
-template <typename REAL>
+template <typename REAL, int INC>
 __global__ void
 trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                      const REAL *__restrict__ dd, REAL *__restrict__ d,
@@ -126,11 +125,22 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
     // reverse pass
     //
     REAL dd0 = boundaries[2 * tid], dd_last = boundaries[2 * tid + 1];
-    d[ind] = dd0;
+    if (INC)
+      u[ind] += dd0;
+    else
+      d[ind] = dd0;
+
     for (int i = 1; i < sys_size - 1; i++) {
-      d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * dd_last;
+      REAL res = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * dd_last;
+      if (INC)
+        u[ind + i] += res;
+      else
+        d[ind + i] = res;
     }
-    d[ind + sys_size - 1] = dd_last;
+    if (INC)
+      u[ind + sys_size - 1] += dd_last;
+    else
+      d[ind + sys_size - 1] = dd_last;
   }
 }
 
