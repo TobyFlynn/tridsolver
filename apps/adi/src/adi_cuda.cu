@@ -257,8 +257,8 @@ int main(int argc, char* argv[]) {
 
   int solvedim;   // user chosen dimension for which the solution is performed
 
-  //int opts[MAXDIM];// = {nx, ny, nz,...};
-  int *opts = get_opts();
+  int opts[MAXDIM];// = {nx, ny, nz,...};
+  //int *opts = get_opts();
   opts[0] = optx;
   opts[1] = opty;
   opts[2] = optz;

@@ -63,10 +63,6 @@ typedef enum{
 EXTERN_C
 void initTridMultiDimBatchSolve(int ndim, int *dims, int *pads);
 
-//in place of a handle and customizations
-EXTERN_C
-int* get_opts();
-
 //tridStatus_t tridSgtsvStridedBatch(int sys_size, const float* a, const float *b, const float *c, float *d, int num_sys, int sys_stride);
 //tridStatus_t tridDgtsvStridedBatch(int sys_size, const double* a, const double *b, const double *c, double *d, int num_sys, int sys_stride);
 //tridStatus_t tridCgtsvStridedBatch(int sys_size, const complexf* a, const complexf *b, const complexf *c, complexf *d, int num_sys, int sys_stride);
