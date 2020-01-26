@@ -1,6 +1,8 @@
 #ifndef TRID_STRIDED_MULTIDIM_PCR_GPU_MPI__
 #define TRID_STRIDED_MULTIDIM_PCR_GPU_MPI__
 
+#include <cmath>
+
 // Function copied from trid_thomaspcr_large.hpp
 template <typename REAL, int regStoreSize>
 __device__ void loadDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
@@ -39,7 +41,7 @@ __device__ void storeDataFromRegisters(REAL* regArray, REAL* devArray, int tridi
 #if (__CUDA_ARCH__ >= 300)
 __launch_bounds__(blockSize, blocksPerSMX)
 #endif*/
-template<typename REAL, int regStoreSize, int groupsPerWarp, int tridSolveSize>
+template<typename REAL, int regStoreSize, int tridSolveSize>
 __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a, 
                                       const REAL* __restrict__ b, const REAL* __restrict__ c,
                                       const REAL* __restrict__ d, REAL* __restrict__ aa, 
@@ -128,7 +130,7 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
 
 template <typename REAL, int tridSolveSize, int blockSize>
 void batched_trid_reduced(const REAL* __restrict__ aa, const REAL* __restrict__ cc, 
-                          REAL* __restrict__ dd) {
+                          REAL* __restrict__ dd, trid_mpi_handle &mpi_handle) {
   
 }
 
@@ -143,21 +145,74 @@ template<typename REAL, int INC>
 void tridMultiDimBatchPCRSolveMPI(trid_handle &handle, trid_mpi_handle &mpi_handle, int solvedim) {
   // For now assume 1 MPI proc per GPU
   
-  // Maybe allocate aa, cc, dd here as will be on GPU mem (so not in handle)
+  // Allocate aa, cc, dd
+  REAL *aa = NULL;
+  REAL *cc = NULL;
+  REAL *dd = NULL;
+  cudaMalloc(&aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaMalloc(&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaMalloc(&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
   
-  // Work out grid and block sizes
+  // TODO Work out grid and block sizes
+  int nBlocks = 0;
+  int nThreads = 0;
   
   if(solvedim == 0) {
     // For x dim might need to transpose (see single node version)
     // Transpose
     // Call tridMultiDimBatchPCRSolveMPI with new arguments
-  } else {
+  } else if(solvedim == 1) {
     // Call forwards pass
+    int numTrids = handle.size[0] * handle.size[2];
+    int length = handle.size[1];
+    int stride = handle.pads[0];
+    int subBatchSize = handle.pads[0];
+    int subBatchStride = handle.pads[0] * handle.size[1];
+    // TODO understand most effective ways to increase these values as size increases
+    int regStoreSize = 8;
+    int tridSolveSize = 32;
+    
+    batched_trid_forwards_kernel<REAL, regStoreSize, tridSolveSize><<<nBlocks, nThreads>>>(
+                                      handle.a, handle.b, handle.c, handle.du, aa, cc, dd, 
+                                      length, stride, numTrids, subBatchSize, subBatchStride);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
     // Will probably have to call each iteration separately as doubt you can make 
     // MPI calls in CUDA
+    int reducedSize = tridSolveSize * 2;
+    // TODO see if a way of getting this without MPI reduce
+    int reducedSize_g;
+    MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.y_comm);
+    // Number of iterations for PCR
+    int p = (int)ceil(log2(reducedSize_g));
+    
+    // Call backwards pass
+  } else if(solvedim == 2) {
+    // Call forwards pass
+    int numTrids = handle.size[0] * handle.size[1];
+    int length = handle.size[2];
+    int stride = handle.pads[0] * handle.size[1];
+    int subBatchSize = handle.pads[0] * handle.size[1];
+    int subBatchStride = 0;
+    // TODO understand most effective ways to increase these values as size increases
+    int regStoreSize = 8;
+    int tridSolveSize = 32;
+    
+    batched_trid_forwards_kernel<REAL, regStoreSize, tridSolveSize><<<nBlocks, nThreads>>>(
+                                       handle.a, handle.b, handle.c, handle.du, aa, cc, dd, 
+                                       length, stride, numTrids, subBatchSize, subBatchStride);
+    
+    // Call PCR reduced (modified to include MPI comm as reduced system will 
+    // be spread over nodes)
+    // Will probably have to call each iteration separately as doubt you can make 
+    // MPI calls in CUDA
+    int reducedSize = tridSolveSize * 2;
+    // TODO see if a way of getting this without MPI reduce
+    int reducedSize_g;
+    MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.z_comm);
+    // Number of iterations for PCR
+    int p = (int)ceil(log2(reducedSize_g));
     
     // Call backwards pass
   }
