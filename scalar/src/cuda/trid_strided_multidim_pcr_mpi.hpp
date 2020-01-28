@@ -3,12 +3,23 @@
 
 #include <cmath>
 
-// Function copied from trid_thomaspcr_large.hpp
+// Function adapted from trid_thomaspcr_large.hpp
 template <typename REAL, int regStoreSize>
-__device__ void loadDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
-                                      int subWarpIdx, const int length, const int numTrids, 
-                                      const int stride, int subBatchID, int subBatchTrid, 
-                                      const int subBatchSize, const REAL blank) {
+__device__ void loadStridedDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, int batchSize, const int batchStride, 
+                                      const REAL blank) {
+  for(int i = 0; i < regStoreSize; i++) {
+    int element = startElement + i;
+    int memLoc = (tridiag % batchSize) + (element * stride) + (tridiag / batchSize) * batchStride;
+    
+    if(element < length && tridiag < numTrids) {
+      regArray[i] = devArray[memLoc];
+    } else {
+      regArray[i] = blank;
+    }
+  }
+  /*
   for (int i=0; i<regStoreSize; i++) {
     int element = subWarpIdx * regStoreSize + i;
     int gmemIdx = subBatchTrid + subBatchID * subBatchSize * stride + stride * element;
@@ -17,14 +28,22 @@ __device__ void loadDataIntoRegisters(REAL *regArray,  REAL*  devArray, int trid
       regArray[i] = devArray[gmemIdx];
     else
       regArray[i] = blank;
-  }
+  }*/
 }
 
 template<typename REAL, int regStoreSize>
-__device__ void storeDataFromRegisters(REAL* regArray, REAL* devArray, int tridiag, 
-                                       int subWarpIdx, const int length, const int numTrids,
-                                       const int stride, int subBatchID, int subBatchTrid,
-                                       const int subBatchSize) {
+__device__ void storeStridedDataFromRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, int batchSize, const int batchStride) {
+  for(int i = 0; i < regStoreSize; i++) {
+    int element = startElement + i;
+    int memLoc = (tridiag % batchSize) + (element * stride) + (tridiag / batchSize) * batchStride;
+    
+    if(element < length && tridiag < numTrids) {
+      devArray[memLoc] = regArray[i];
+    }
+  }
+  /*
   for (int i=0; i<regStoreSize; i++) {   
     int element = subWarpIdx * regStoreSize + i;
     int gmemIdx = subBatchTrid + subBatchID * subBatchSize * stride + stride * element;
@@ -32,7 +51,7 @@ __device__ void storeDataFromRegisters(REAL* regArray, REAL* devArray, int tridi
     if (element < length && tridiag < numTrids) {
       devArray[gmemIdx] = regArray[i];
     }
-  }
+  }*/
 }
 
 // Function that performs the modified Thomas forward pass on a GPU
@@ -46,36 +65,42 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
                                       const REAL* __restrict__ b, const REAL* __restrict__ c,
                                       const REAL* __restrict__ d, REAL* __restrict__ aa, 
                                       REAL* __restrict__ cc, REAL* __restrict__ dd, 
-                                      const int length, const int stride, const int numTrids, 
-                                      const int subBatchSize, const int subBatchStride) {
+                                      REAL* __restrict__ aa_r, REAL* __restrict__ cc_r, 
+                                      REAL* __restrict__ dd_r, const int length, 
+                                      const int stride, const int numTrids, 
+                                      const int batchSize, const int batchStride) {
   REAL a_reg[regStoreSize], b_reg[regStoreSize], c_reg[regStoreSize],
        d_reg[regStoreSize], aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize]; 
   REAL bbi;
   
-  int warpIdx = threadIdx.x / tridSolveSize;
+  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int tridiag = threadId_g / threadsPerTrid;
+  int startElement = (threadId_g - (tridiag * threadsPerTrid)) * regStoreSize;
+  
+  /*int warpIdx = threadIdx.x / tridSolveSize;
   int subWarpIdx = threadIdx.x / (tridSolveSize / groupsPerTrid);
   int subThreadIdx = threadIdx.x % (tridSolveSize / groupsPerTrid);
    
   int tridiag = blockIdx.x * (tridSolveSize / groupsPerTrid) + subThreadIdx;
   
   int subBatchID = tridiag / subBatchSize;
-  int subBatchTrid = tridiag % subBatchSize;
+  int subBatchTrid = tridiag % subBatchSize;*/
    
-  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, a, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride, (REAL)0.);
+  loadStridedDataIntoRegisters<REAL, regStoreSize>(a_reg, a, tridiag, startElement, length, 
+                                                   numTrids, stride, batchSize, batchStride, 
+                                                   (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(b_reg, b, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride, (REAL)1.);
+  loadStridedDataIntoRegisters<REAL, regStoreSize>(b_reg, b, tridiag, startElement, length, 
+                                                   numTrids, stride, batchSize, batchStride, 
+                                                   (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, c, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride, (REAL)0.);
+  loadStridedDataIntoRegisters<REAL, regStoreSize>(c_reg, c, tridiag, startElement, length, 
+                                                   numTrids, stride, batchSize, batchStride, 
+                                                   (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, d, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride, (REAL)0.);
+  loadStridedDataIntoRegisters<REAL, regStoreSize>(d_reg, d, tridiag, startElement, length, 
+                                                   numTrids, stride, batchSize, batchStride, 
+                                                   (REAL)0.);
   
   // Reduce the system
   if (regStoreSize >= 2) {
@@ -114,23 +139,35 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
     cc_reg[0] = bbi * c_reg[0];      
   }
   
+  // Store reduced system
+  if(tridiag < numTrids) {
+    // TODO check if this is correct as values are padded?
+    int n = regStoreSize - 1;
+    /*if(startElement + n >= length) {
+      n = startElement - lenght - 1;
+    }*/
+    aa_r[2 * tridiag]     = aa_reg[0];
+    aa_r[2 * tridiag + 1] = aa_reg[n];
+    cc_r[2 * tridiag]     = cc_reg[0];
+    cc_r[2 * tridiag + 1] = cc_reg[n];
+    dd_r[2 * tridiag]     = dd_reg[0];
+    dd_r[2 * tridiag + 1] = dd_reg[n];
+  }
+  
   // Store aa, cc and dd values
-  storeDataFromRegisters<REAL, regStoreSize>(aa_reg, aa, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride);
+  storeStridedDataFromRegisters<REAL, regStoreSize>(aa_reg, aa, tridiag, startElement, length, 
+                                                    numTrids, stride, batchSize, batchStride);
   
-  storeDataFromRegisters<REAL, regStoreSize>(cc_reg, cc, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride);
+  storeStridedDataFromRegisters<REAL, regStoreSize>(cc_reg, cc, tridiag, startElement, length, 
+                                                    numTrids, stride, batchSize, batchStride);
   
-  storeDataFromRegisters<REAL, regStoreSize>(dd_reg, dd, tridiag, subWarpIdx, length, 
-                                            numTrids, stride, subBatchID, subBatchTrid, 
-                                            subBatchSize, subBatchStride);
+  storeStridedDataFromRegisters<REAL, regStoreSize>(dd_reg, dd, tridiag, startElement, length, 
+                                                    numTrids, stride, batchSize, batchStride);
 }
 
 template <typename REAL, int tridSolveSize, int blockSize>
-void batched_trid_reduced(const REAL* __restrict__ aa, const REAL* __restrict__ cc, 
-                          REAL* __restrict__ dd, trid_mpi_handle &mpi_handle) {
+void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict__ cc_r, 
+                          REAL* __restrict__ dd_r, const int s, trid_mpi_handle &mpi_handle) {
   
 }
 
@@ -153,10 +190,6 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle &handle, trid_mpi_handle &mpi_hand
   cudaMalloc(&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
   cudaMalloc(&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
   
-  // TODO Work out grid and block sizes
-  int nBlocks = 0;
-  int nThreads = 0;
-  
   if(solvedim == 0) {
     // For x dim might need to transpose (see single node version)
     // Transpose
@@ -166,26 +199,57 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle &handle, trid_mpi_handle &mpi_hand
     int numTrids = handle.size[0] * handle.size[2];
     int length = handle.size[1];
     int stride = handle.pads[0];
-    int subBatchSize = handle.pads[0];
-    int subBatchStride = handle.pads[0] * handle.size[1];
-    // TODO understand most effective ways to increase these values as size increases
+    int batchSize = handle.pads[0];
+    int batchStride = handle.pads[0] * handle.size[1];
     int regStoreSize = 8;
-    int tridSolveSize = 32;
+    int threadsPerTrid = (int)ceil((double)handle.size[1] / (double)regStoreSize);
+    
+    // Work out number of blocks and threads needed
+    int totalThreads = threadsPerTrid * numTrids;
+    int nThreads = 512;
+    int nBlocks = 1;
+    if(totalThreads < 512) {
+      nThreads = totalThreads;
+    } else {
+      nBlocks = (int)ceil((double)totalThreads / (double)nThreads);
+    }
+    
+    int reducedSize = threadsPerTrid * numTrids * 2;
+    // TODO change to one interwoven array once algorithm is working
+    REAL *aa_r = NULL;
+    REAL *cc_r = NULL;
+    REAL *dd_r = NULL;
+    cudaMalloc(&aa_r, sizeof(REAL) * reducedSize);
+    cudaMalloc(&cc_r, sizeof(REAL) * reducedSize);
+    cudaMalloc(&dd_r, sizeof(REAL) * reducedSize);
     
     batched_trid_forwards_kernel<REAL, regStoreSize, tridSolveSize><<<nBlocks, nThreads>>>(
-                                      handle.a, handle.b, handle.c, handle.du, aa, cc, dd, 
-                                      length, stride, numTrids, subBatchSize, subBatchStride);
+                                      handle.a, handle.b, handle.c, handle.du, aa, cc, dd, aa_r, 
+                                      cc_r, dd_r, length, stride, numTrids, batchSize, 
+                                      batchStride);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
     // Will probably have to call each iteration separately as doubt you can make 
     // MPI calls in CUDA
-    int reducedSize = tridSolveSize * 2;
     // TODO see if a way of getting this without MPI reduce
     int reducedSize_g;
     MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.y_comm);
     // Number of iterations for PCR
     int p = (int)ceil(log2(reducedSize_g));
+    // Need arrays to store values from other MPI procs
+    REAL *aa_r_minus = NULL;
+    REAL *aa_r_plus  = NULL;
+    REAL *cc_r_minus = NULL;
+    REAL *cc_r_plus  = NULL;
+    REAL *dd_r_minus = NULL;
+    REAL *dd_r_plus  = NULL;
+    cudaMalloc(&aa_r_minus, sizeof(REAL) * reducedSize);
+    cudaMalloc(&aa_r_plus, sizeof(REAL) * reducedSize);
+    cudaMalloc(&cc_r_minus, sizeof(REAL) * reducedSize);
+    cudaMalloc(&cc_r_plus, sizeof(REAL) * reducedSize);
+    cudaMalloc(&dd_r_minus, sizeof(REAL) * reducedSize);
+    cudaMalloc(&dd_r_plus, sizeof(REAL) * reducedSize);
     
     // Call backwards pass
   } else if(solvedim == 2) {
