@@ -239,8 +239,8 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
 
 template<typename REAL>
 void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, const REAL* __restrict__ d,
-                            REAL* __restrict__ a_s, REAL* __restrict__ c_s, REAL* __restrict__ d_s,
-                            int solvedim, trid_mpi_handle &mpi_handle) {
+                     REAL* __restrict__ a_s, REAL* __restrict__ c_s, REAL* __restrict__ d_s,
+                     int solvedim, trid_mpi_handle &mpi_handle) {
   // Get sizes for each proc and the size of the reduced system
   int tmp = numElements / numProcs;
   int remainder = numElements % numProcs;
@@ -271,6 +271,12 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, con
   REAL *sndbuf_1 = (REAL *) malloc(3 * this_proc_reduced_size * numTrids * sizeof(REAL));
   REAL *sndbuf_2 = (REAL *) malloc(3 * this_proc_reduced_size * numTrids * sizeof(REAL));
   bool usedFirstSndBuf = false;
+  
+  /*
+   * =====================================
+   * -S ELEMENTS
+   * =====================================
+   */
   
   // Only need to check procs that are 'above' the current MPI proc for "-s" elements
   for(int i = mpi_handle.coords[solvedim] + 1; i < mpi_handle.pdims[solvedim]; i++) {
@@ -306,10 +312,6 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, con
     }
   }
   
-  // The start and end indices for the "-s" elements to recieve
-  int get_start_g = reducedStart_g[mpi_handle.coords[solvedim]] - s;
-  int get_end_g = get_start_g + numTrids * reducedSizes[mpi_handle.coords[solvedim]];
-  
   // Allocate receive buffer
   REAL *rcvbuf = (REAL *) malloc(3 * this_proc_reduced_size * numTrids * sizeof(REAL));
   
@@ -320,7 +322,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, con
   // Only need to check procs that are 'below' the current MPI proc for "-s" elements
   for(int i = 0; i <  mpi_handle.coords[solvedim]; i++) {
     int current_start_g = reducedStart_g[i];
-    int current_end_g = current_start_g + + reducedSizes[i];
+    int current_end_g = current_start_g + reducedSizes[i];
      
     // Check if need to receive data from this MPI proc
     if((rcv_start_g <= current_end_g && rcv_start_g >= current_start_g)
@@ -337,8 +339,8 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, con
       MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
       
       // Get local start index to receive to
-      int start_l = MAX(rcv_start_g - current_start_g, 0);
-      int end_l = MIN(rcv_end_g - current_start_g, this_proc_reduced_size - 1);
+      int start_l = MAX(current_start_g - rcv_start_g, 0);
+      int end_l = MIN(current_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
       int count = end_l - start_l + 1;
       
       // Receive data and copy to arrays
@@ -346,18 +348,185 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, con
     }
   }
   
-  // TODO receive
+  /*
+   * =====================================
+   * +S ELEMENTS
+   * =====================================
+   */
+  usedFirstSndBuf = false;
   
-  // TODO repeat for the "+s" elements
+  // Only need to check procs that are 'below' the current MPI proc for "+s" elements
+  for(int i = 0; i < mpi_handle.coords[solvedim]; i++) {
+    int send_start_g = reducedStart_g[i] + s;
+    int send_end_g = send_start_g + reducedSizes[i];
+     
+    // Check if need to send data to this MPI proc
+    if((send_start_g <= this_proc_end_g && send_start_g >= this_proc_start_g)
+        || (send_end_g <= this_proc_end_g && send_end_g >= this_proc_start_g)
+        || (send_start_g < this_proc_start_g && send_end_g > this_proc_end_g)) {
+      // Get rank of MPI proc to send to
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0];
+      dst_coords[1] = mpi_handle.coords[1];
+      dst_coords[2] = mpi_handle.coords[2];
+      dst_coords[solvedim] = i;
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      
+      // Get local start index to send
+      int start_l = MAX(send_start_g - this_proc_start_g, 0);
+      int end_l = MIN(send_end_g - this_proc_start_g, this_proc_reduced_size - 1);
+      int count = end_l - start_l + 1;
+      
+      // Pack data into send buffer and send
+      if(usedFirstSndBuf) {
+        sendReducedMPI(start_l, count, dst_rank, a, c, d, sndbuf_2);
+      } else {
+        sendReducedMPI(start_l, count, dst_rank, a, c, d, sndbuf_1);
+        usedFirstSndBuf = true;
+      }
+    }
+  }
   
-  // TODO check if need to copy local memory to 'a_s', 'c_s' and 'd_s'
+  // The start and end indices for the "+s" elements to recieve
+  rcv_start_g = this_proc_start_g + s;
+  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
   
-  // TODO check if need to zero part of 'a_s', 'c_s' and 'd_s'
+  // Only need to check procs that are 'above' the current MPI proc for "+s" elements
+  for(int i = mpi_handle.coords[solvedim] + 1; i <  mpi_handle.pdims[solvedim]; i++) {
+    int current_start_g = reducedStart_g[i];
+    int current_end_g = current_start_g + reducedSizes[i];
+     
+    // Check if need to receive data from this MPI proc
+    if((rcv_start_g <= current_end_g && rcv_start_g >= current_start_g)
+        || (rcv_end_g <= current_end_g && rcv_end_g >= current_start_g)
+        || (rcv_start_g < current_start_g && rcv_end_g > current_end_g)) {
+      // Get rank of MPI proc to receive from
+      // Convert source coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0];
+      src_coords[1] = mpi_handle.coords[1];
+      src_coords[2] = mpi_handle.coords[2];
+      src_coords[solvedim] = i;
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      
+      // Get local start index to receive to
+      int start_l = MAX(current_start_g - rcv_start_g, 0);
+      int end_l = MIN(current_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
+      int count = end_l - start_l + 1;
+      
+      // Receive data and copy to arrays
+      receiveReducedMPI(this_proc_reduced_size + start_l, count, src_rank, a_s, c_s, d_s, rcvbuf);
+    }
+  }
+  
+  // Check if need to copy local memory to 'a_s', 'c_s' and 'd_s'
+  // Check for -S elements
+  rcv_start_g = this_proc_start_g - s;
+  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  
+  if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
+      || (rcv_end_g <= this_proc_end_g && rcv_end_g >= this_proc_start_g)
+      || (rcv_start_g < this_proc_start_g && rcv_end_g > this_proc_end_g)) {
+    
+    int snd_start_l = MAX(rcv_start_g - this_proc_start_g, 0);
+    
+    int rcv_start_l = MAX(this_proc_start_g - rcv_start_g, 0);
+    int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
+    int count = end_l - start_l + 1;
+    
+    snd_start_l *= numTrids;
+    rcv_start_l *= numTrids;
+    count *= numTrids;
+  
+    cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+  }
+  
+  // Check for +S elements
+  rcv_start_g = this_proc_start_g + s;
+  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  
+  if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
+      || (rcv_end_g <= this_proc_end_g && rcv_end_g >= this_proc_start_g)
+      || (rcv_start_g < this_proc_start_g && rcv_end_g > this_proc_end_g)) {
+    
+    int snd_start_l = MAX(rcv_start_g - this_proc_start_g, 0);
+    
+    int rcv_start_l = MAX(this_proc_start_g - rcv_start_g, 0);
+    int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
+    int count = end_l - start_l + 1;
+    
+    snd_start_l *= numTrids;
+    rcv_start_l += this_proc_reduced_size;
+    rcv_start_l *= numTrids;
+    count *= numTrids;
+  
+    cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+  }
+  
+  // Check if need to zero part of 'a_s', 'c_s' and 'd_s'
+  // Check for -S elements
+  rcv_start_g = this_proc_start_g - s;
+  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  if(rcv_start_g < 0) {
+    int count = MIN(abs(rcv_start_g), this_proc_reduced_size);
+    int numThreads = count * numTrids;
+    
+    int nThreads = 512;
+    int nBlocks = 1;
+    if(numThreads < 512) {
+      nThreads = totalThreads;
+    } else {
+      nBlocks = (int)ceil((double)totalThreads / (double)nThreads);
+    }
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(0, count * numTrids, a_s);
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(0, count * numTrids, c_s);
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(0, count * numTrids, d_s);
+  }
+  
+  // Check for +S elements
+  rcv_start_g = this_proc_start_g + s;
+  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  
+  int reduced_end = reducedStart_g[mpi_handle.pdims[solvedim] - 1] + reducedSizes[mpi_handle.pdims[solvedim] - 1] - 1;
+  
+  if(rcv_end_g > reduced_end) {
+    int count = rcv_end_g - reduced_end;
+    int start = (2 * this_proc_reduced_size - count) * numTrids;
+    
+    int numThreads = count * numTrids;
+    
+    int nThreads = 512;
+    int nBlocks = 1;
+    if(numThreads < 512) {
+      nThreads = totalThreads;
+    } else {
+      nBlocks = (int)ceil((double)totalThreads / (double)nThreads);
+    }
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(start, count * numTrids, a_s);
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(start, count * numTrids, c_s);
+    zeroArray<<<nBlocks,nThreads>>>zeroArray(start, count * numTrids, d_s);
+  }
   
   // Free buffers
   free(sndbuf_1);
   free(sndbuf_2);
   free(rcvbuf);
+}
+
+// TODO see if more efficient to zero array in chunks
+template<typename REAL>
+__global__ void zeroArray(int start, int count, REAL* __restrict__ array) {
+  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  if(threadId_g <= count) {
+    array[start + threadId_g] = (REAL)0.0;
+  }
 }
 
 template<typename REAL>
@@ -551,12 +720,17 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
     // s = 2^p
     int s = 1 << p;
     
-    // TODO Send and receive necessary values
+    // Send and receive necessary values
+    getValuesForPCR<REAL>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, mpi_handle);
     
+    // Run PCR step on GPU
     batched_trid_reduced_kernel<<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
   }
   
-  // TODO Final part of PCR
+  // TODO communicate boundary values for final step of PCR
+  
+  // Final part of PCR
+  batched_trid_reduced_final_kernel<<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
   
   // Free memory
   cudaFree(aa_r_s);
@@ -564,6 +738,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   cudaFree(dd_r_s);
 }
 
+// TODO fix race condition, look into __syncthreads()
 template <typename REAL, int tridSolveSize, int blockSize>
 __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a, 
                                           REAL* __restrict__ c, REAL* __restrict__ d, 
@@ -617,6 +792,24 @@ __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restri
   d[i] = r * (d[i] - a[i] * d_s[minusId] - c[i] * d_s[plusId]);
   a[i] = -r * a[i] * a_s[minusId];
   c[i] = -r * c[i] * c_s[plusId];
+}
+
+// TODO fix race condition, look into __syncthreads()
+template<typename REAL>
+__global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
+                                                  REAL* __restrict__ d, REAL* __restrict__  a_s, 
+                                                  REAL* __restrict__ c_s, 
+                                                  REAL* __restrict__ d_s) {
+  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int tridiag = threadId_g / threadsPerTrid;
+  int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
+  int i = tridiag + numTrids * threadId_l * 2;
+  
+  d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids]
+  
+  i +=  numTrids;
+  
+  d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids]
 }
 
 
@@ -682,6 +875,7 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle &handle, trid_mpi_handle &mpi_hand
     cudaFree(cc_r);
     cudaFree(dd_r);
   } else if(solvedim == 2) {
+    /*
     // Call forwards pass
     int numTrids = handle.size[0] * handle.size[1];
     int length = handle.size[2];
@@ -708,6 +902,7 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle &handle, trid_mpi_handle &mpi_hand
     int p = (int)ceil(log2(reducedSize_g));
     
     // Call backwards pass
+    */
   }
 }
 
