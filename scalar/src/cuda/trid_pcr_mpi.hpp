@@ -2,11 +2,12 @@
 #define TRID_GPU_MPI_PCR__
 
 // Reduced system for each trid must not be split across multiple blocks in order to prevent race condition
-template <typename REAL, int tridSolveSize, int blockSize>
+template <typename REAL>
 __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a, 
-                                          REAL* __restrict__ c, REAL* __restrict__ d, 
-                                          REAL* __restrict__  a_s, REAL* __restrict__ c_s, 
-                                          REAL* __restrict__ d_s) {
+                                      REAL* __restrict__ c, REAL* __restrict__ d, 
+                                      REAL* __restrict__  a_s, REAL* __restrict__ c_s, 
+                                      REAL* __restrict__ d_s, int numTrids, int threadsPerTrid, 
+                                      int reducedSize) {
   int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
@@ -54,11 +55,11 @@ __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a,
   c[i] = -r * c[i] * c_p;
 }
 
-template <typename REAL, int tridSolveSize, int blockSize>
+template <typename REAL>
 __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
                                             REAL* __restrict__ d, REAL* __restrict__  a_s, 
-                                            REAL* __restrict__ c_s, 
-                                            REAL* __restrict__ d_s) {
+                                            REAL* __restrict__ c_s, REAL* __restrict__ d_s, 
+                                            int numTrids, int threadsPerTrid, int reducedSize) {
   int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
@@ -76,7 +77,8 @@ __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restri
 // Reduced system for each trid must not be split across multiple blocks in order to prevent race condition
 template<typename REAL>
 __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
-                                                  REAL* __restrict__ d, REAL* __restrict__ d_s) {
+                                                  REAL* __restrict__ d, REAL* __restrict__ d_s, 
+                                                  int numTrids, int threadsPerTrid) {
   int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));

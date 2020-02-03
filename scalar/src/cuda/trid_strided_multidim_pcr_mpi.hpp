@@ -21,16 +21,6 @@ __device__ void loadStridedDataIntoRegisters(REAL *regArray,  REAL*  devArray, i
       regArray[i] = blank;
     }
   }
-  /*
-  for (int i=0; i<regStoreSize; i++) {
-    int element = subWarpIdx * regStoreSize + i;
-    int gmemIdx = subBatchTrid + subBatchID * subBatchSize * stride + stride * element;
-
-    if (element < length && tridiag < numTrids)
-      regArray[i] = devArray[gmemIdx];
-    else
-      regArray[i] = blank;
-  }*/
 }
 
 template<typename REAL, int regStoreSize>
@@ -45,15 +35,6 @@ __device__ void storeStridedDataFromRegisters(REAL *regArray,  REAL*  devArray, 
       devArray[memLoc] = regArray[i];
     }
   }
-  /*
-  for (int i=0; i<regStoreSize; i++) {   
-    int element = subWarpIdx * regStoreSize + i;
-    int gmemIdx = subBatchTrid + subBatchID * subBatchSize * stride + stride * element;
-      
-    if (element < length && tridiag < numTrids) {
-      devArray[gmemIdx] = regArray[i];
-    }
-  }*/
 }
 
 // Function that performs the modified Thomas forward pass on a GPU
