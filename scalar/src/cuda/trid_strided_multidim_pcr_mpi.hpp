@@ -709,11 +709,16 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   cudaMalloc(&cc_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
   cudaMalloc(&dd_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
   
+  // Needed for initial and final PCR stages as trid systems cannot be split across multiple blocks
+  // in order to prevent race conditions
+  int wholeTridThreads = (512 / threadsPerTrid) * 512;
+  int wholeTridBlocks = (int)ceil((double)(threadsPerTrid * numTrids) / (double)wholeTridThreads);
+  
   // Send and receive initial values
   getInitialValuesForPCR(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, mpi_handle);
   
   // Perform initial step of PCR
-  batched_trid_reduced_init_kernel<<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, 
+  batched_trid_reduced_init_kernel<<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, 
                                                           dd_r_s);
   
   for(int p = 1; p <= P; p++) {
@@ -730,7 +735,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   // TODO communicate boundary values for final step of PCR
   
   // Final part of PCR
-  batched_trid_reduced_final_kernel<<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
+  batched_trid_reduced_final_kernel<<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
   
   // Free memory
   cudaFree(aa_r_s);
@@ -738,7 +743,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   cudaFree(dd_r_s);
 }
 
-// TODO fix race condition, look into __syncthreads()
+// Reduced system for each trid must not be split across multiple blocks in order to prevent race condition
 template <typename REAL, int tridSolveSize, int blockSize>
 __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a, 
                                           REAL* __restrict__ c, REAL* __restrict__ d, 
@@ -752,27 +757,43 @@ __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a,
   int i_p = i + numTrids;
   int i_m = i - numTrids;
   
+  REAL a_p, a_m, c_p, c_m, d_p, d_m;
+  
   if(threadId_l == 0) {
     int id_s = tridiag;
-    REAL r = (REAL)1.0 - a[i] * c_s[id_s] - c[i] * a[i_p];
-    r = (REAL)1.0 / r;
-    d[i] = r * (d[i] - a[i] * d_s[id_s] - c[i] * d[i_p]);
-    a[i] = -r * a[i] * a_s[id_s];
-    c[i] = -r * c[i] * c[i_p];
-  } else if (threadId_l == threadsPerTrid - 1) {
+    a_m = a_s[id_s];
+    c_m = c_s[id_s];
+    d_m = d_s[id_s];
+    
+    a_p = a[i_p];
+    c_p = c[i_p];
+    d_p = d[i_p];
+  } else if(threadId_l == threadsPerTrid - 1) {
     int id_s = reducedSize * numTrids + tridiag;
-    REAL r = (REAL)1.0 - a[i] * c[i_m] - c[i] * a_s[id_s];
-    r = (REAL)1.0 / r;
-    d[i] = r * (d[i] - a[i] * d[i_m] - c[i] * d_s[id_s]);
-    a[i] = -r * a[i] * a[i_m];
-    c[i] = -r * c[i] * c_s[id_s];
+    a_p = a_s[id_s];
+    c_p = c_s[id_s];
+    d_p = d_s[id_s];
+    
+    a_m = a[i_m];
+    c_m = c[i_m];
+    d_m = d[i_m];
   } else {
-    REAL r = (REAL)1.0 - a[i] * c[i_m] - c[i] * a[i_p];
-    r = (REAL)1.0 / r;
-    d[i] = r * (d[i] - a[i] * d[i_m] - c[i] * d[i_p]);
-    a[i] = -r * a[i] * a[i_m];
-    c[i] = -r * c[i] * c[i_p];
+    a_p = a[i_p];
+    c_p = c[i_p];
+    d_p = d[i_p];
+    
+    a_m = a[i_m];
+    c_m = c[i_m];
+    d_m = d[i_m];
   }
+  
+  __syncthreads();
+  
+  REAL r = (REAL)1.0 - a[i] * c_m - c[i] * a_p;
+  r = (REAL)1.0 / r;
+  d[i] = r * (d[i] - a[i] * d_m - c[i] * d_p);
+  a[i] = -r * a[i] * a_m;
+  c[i] = -r * c[i] * c_p;
 }
 
 template <typename REAL, int tridSolveSize, int blockSize>
@@ -794,7 +815,7 @@ __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restri
   c[i] = -r * c[i] * c_s[plusId];
 }
 
-// TODO fix race condition, look into __syncthreads()
+// Reduced system for each trid must not be split across multiple blocks in order to prevent race condition
 template<typename REAL>
 __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
                                                   REAL* __restrict__ d, REAL* __restrict__  a_s, 
@@ -805,11 +826,16 @@ __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int i = tridiag + numTrids * threadId_l * 2;
   
+  // To prevent race condition between threads
+  REAL d_p2 = d[i + 2 * numTrids];
+  
+  __syncthreads();
+  
   d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids]
   
   i +=  numTrids;
   
-  d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids]
+  d[i] = d[i] - a[i] * d[i] - c[i] * d_p2;
 }
 
 
