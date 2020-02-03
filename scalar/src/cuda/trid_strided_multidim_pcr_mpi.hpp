@@ -55,6 +55,92 @@ __device__ void storeStridedDataFromRegisters(REAL *regArray,  REAL*  devArray, 
 }
 
 template<typename REAL>
+void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
+                          int solvedim, trid_mpi_handle &mpi_handle) {
+  REAL *sndbuf = (REAL *) malloc(numTrids * sizeof(REAL));
+  REAL *rcvbuf = (REAL *) malloc(numTrids * sizeof(REAL));
+  
+  cudaMemcpy(&sndbuf[0], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
+  
+  // Send
+  if(solvedim == 1) {
+    if(mpi_handle.coords[1] > 0) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0];
+      dst_coords[1] = mpi_handle.coords[1] - 1;
+      dst_coords[2] = mpi_handle.coords[2];
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      // Send the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Send(&sndbuf[0], numTrids, MPI_FLOAT, dst_rank, 0, mpi_handle.comm);
+      } else {
+        MPI_Send(&sndbuf[0], numTrids, MPI_DOUBLE, dst_rank, 0, mpi_handle.comm);
+      }
+    }
+  } else if(solvedim == 2) {
+    if(mpi_handle.coords[2] > 0) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0];
+      dst_coords[1] = mpi_handle.coords[1];
+      dst_coords[2] = mpi_handle.coords[2] - 1;
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      // Send the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Send(&sndbuf[0], numTrids, MPI_FLOAT, dst_rank, 0, mpi_handle.comm);
+      } else {
+        MPI_Send(&sndbuf[0], numTrids, MPI_DOUBLE, dst_rank, 0, mpi_handle.comm);
+      }
+    }
+  }
+  
+  // Receive 
+  if(solvedim == 1) {
+    if(mpi_handle.coords[1] < mpi_handle.pdims[1] - 1) {
+      // Convert src coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0];
+      src_coords[1] = mpi_handle.coords[1] + 1;
+      src_coords[2] = mpi_handle.coords[2];
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      // Receive the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_FLOAT, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      } else {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_DOUBLE, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      }
+    }
+  } else if(solvedim == 2) {
+    if(mpi_handle.coords[2] < mpi_handle.pdims[2] - 1) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0];
+      src_coords[1] = mpi_handle.coords[1];
+      src_coords[2] = mpi_handle.coords[2] + 1;
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      // Receive the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_FLOAT, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      } else {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_DOUBLE, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      }
+    }
+  }
+  
+  // Copy to GPU
+  cudaMemcpy(&d_s[0], &rcvbuf[0], numTrids, cudaMemcpyHostToDevice);
+}
+
+template<typename REAL>
 void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, const REAL* __restrict__ d,
                             REAL* __restrict__ a_s, REAL* __restrict__ c_s, REAL* __restrict__ d_s,
                             int solvedim, trid_mpi_handle &mpi_handle) {
@@ -732,10 +818,11 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
     batched_trid_reduced_kernel<<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
   }
   
-  // TODO communicate boundary values for final step of PCR
+  // Communicate boundary values for final step of PCR
+  getFinalValuesForPCR(dd_r, dd_r_s, solvedim, mpi_handle);
   
   // Final part of PCR
-  batched_trid_reduced_final_kernel<<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s);
+  batched_trid_reduced_final_kernel<<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, dd_r_s);
   
   // Free memory
   cudaFree(aa_r_s);
@@ -818,16 +905,19 @@ __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restri
 // Reduced system for each trid must not be split across multiple blocks in order to prevent race condition
 template<typename REAL>
 __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
-                                                  REAL* __restrict__ d, REAL* __restrict__  a_s, 
-                                                  REAL* __restrict__ c_s, 
-                                                  REAL* __restrict__ d_s) {
+                                                  REAL* __restrict__ d, REAL* __restrict__ d_s) {
   int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int i = tridiag + numTrids * threadId_l * 2;
   
   // To prevent race condition between threads
-  REAL d_p2 = d[i + 2 * numTrids];
+  REAL d_p2;
+  if(threadId_l == threadsPerTrid - 1) {
+    d_p2 = d_s[tridiag];
+  } else {
+    d_p2= d[i + 2 * numTrids];
+  }
   
   __syncthreads();
   
