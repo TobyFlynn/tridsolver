@@ -79,7 +79,23 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
              numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
   
   // Send | all 'a_0's | all 'c_0's | all 'd_0's |
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] > 0) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0] - 1;
+      dst_coords[1] = mpi_handle.coords[1];
+      dst_coords[2] = mpi_handle.coords[2];
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      // Send the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Send(&sndbuf[0], numTrids * 3, MPI_FLOAT, dst_rank, 0, mpi_handle.comm);
+      } else {
+        MPI_Send(&sndbuf[0], numTrids * 3, MPI_DOUBLE, dst_rank, 0, mpi_handle.comm);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] > 0) {
       // Convert destination coordinates of MPI node into the node's rank
       int dst_coords[3];
@@ -114,7 +130,25 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   }
   
   // Receive 
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] < mpi_handle.pdims[0] - 1) {
+      // Convert src coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0] + 1;
+      src_coords[1] = mpi_handle.coords[1];
+      src_coords[2] = mpi_handle.coords[2];
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      // Receive the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Recv(&rcvbuf[0], numTrids * 3, MPI_FLOAT, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      } else {
+        MPI_Recv(&rcvbuf[0], numTrids * 3, MPI_DOUBLE, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] < mpi_handle.pdims[1] - 1) {
       // Convert src coordinates of MPI node into the node's rank
       int src_coords[3];
@@ -153,7 +187,23 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   }
   
   // Send | all 'a_n's | all 'c_n's | all 'd_n's |
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] < mpi_handle.pdims[0] - 1) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0] + 1;
+      dst_coords[1] = mpi_handle.coords[1];
+      dst_coords[2] = mpi_handle.coords[2];
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      // Send the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Send(&sndbuf[3 * numTrids], numTrids * 3, MPI_FLOAT, dst_rank, 0, mpi_handle.comm);
+      } else {
+        MPI_Send(&sndbuf[3 * numTrids], numTrids * 3, MPI_DOUBLE, dst_rank, 0, mpi_handle.comm);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] < mpi_handle.pdims[1] - 1) {
       // Convert destination coordinates of MPI node into the node's rank
       int dst_coords[3];
@@ -188,7 +238,25 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   }
   
   // Receive 
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] > 0) {
+      // Convert src coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0] - 1;
+      src_coords[1] = mpi_handle.coords[1];
+      src_coords[2] = mpi_handle.coords[2];
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      // Receive the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Recv(&rcvbuf[0], numTrids * 3, MPI_FLOAT, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      } else {
+        MPI_Recv(&rcvbuf[0], numTrids * 3, MPI_DOUBLE, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] > 0) {
       // Convert src coordinates of MPI node into the node's rank
       int src_coords[3];
@@ -534,7 +602,23 @@ void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
   cudaMemcpy(&sndbuf[0], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
   
   // Send
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] > 0) {
+      // Convert destination coordinates of MPI node into the node's rank
+      int dst_coords[3];
+      dst_coords[0] = mpi_handle.coords[0] - 1;
+      dst_coords[1] = mpi_handle.coords[1];
+      dst_coords[2] = mpi_handle.coords[2];
+      int dst_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, dst_coords, &dst_rank);
+      // Send the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Send(&sndbuf[0], numTrids, MPI_FLOAT, dst_rank, 0, mpi_handle.comm);
+      } else {
+        MPI_Send(&sndbuf[0], numTrids, MPI_DOUBLE, dst_rank, 0, mpi_handle.comm);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] > 0) {
       // Convert destination coordinates of MPI node into the node's rank
       int dst_coords[3];
@@ -569,7 +653,25 @@ void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
   }
   
   // Receive 
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    if(mpi_handle.coords[0] < mpi_handle.pdims[0] - 1) {
+      // Convert src coordinates of MPI node into the node's rank
+      int src_coords[3];
+      src_coords[0] = mpi_handle.coords[0] + 1;
+      src_coords[1] = mpi_handle.coords[1];
+      src_coords[2] = mpi_handle.coords[2];
+      int src_rank = 0;
+      MPI_Cart_rank(mpi_handle.comm, src_coords, &src_rank);
+      // Receive the boundary data
+      if(std::is_same<REAL, float>::value) {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_FLOAT, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      } else {
+        MPI_Recv(&rcvbuf[0], numTrids, MPI_DOUBLE, src_rank, 0, mpi_handle.comm, 
+                 MPI_STATUS_IGNORE);
+      }
+    }
+  } else if(solvedim == 1) {
     if(mpi_handle.coords[1] < mpi_handle.pdims[1] - 1) {
       // Convert src coordinates of MPI node into the node's rank
       int src_coords[3];
