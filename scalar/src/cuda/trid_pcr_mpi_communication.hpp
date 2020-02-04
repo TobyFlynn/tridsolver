@@ -57,9 +57,10 @@ void receiveReducedMPI(int start, int count, int numTrids, int rank, const REAL*
 }
 
 template<typename REAL>
-void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, const REAL* __restrict__ d,
-                            REAL* __restrict__ a_s, REAL* __restrict__ c_s, REAL* __restrict__ d_s,
-                            int solvedim, int numTrids, int threadsPerTrid, trid_mpi_handle &mpi_handle) {
+void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
+                            const REAL* __restrict__ d, REAL* __restrict__ a_s, 
+                            REAL* __restrict__ c_s, REAL* __restrict__ d_s, int solvedim, 
+                            int numTrids, int threadsPerTrid, trid_mpi_handle &mpi_handle) {
   // Buffer for a0, an, c0, cn, d0 and dn values for each trid system
   /*
    * sndbuf = | all 'a_0's | all 'c_0's | all 'd_0's | all 'a_n's | all 'c_n's | all 'd_n's |
@@ -240,9 +241,10 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
 }
 
 template<typename REAL>
-void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, const REAL* __restrict__ d,
-                     REAL* __restrict__ a_s, REAL* __restrict__ c_s, REAL* __restrict__ d_s,
-                     int solvedim, int numTrids, int size_g, int regStoreSize, trid_mpi_handle &mpi_handle) {
+void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
+                     const REAL* __restrict__ d, REAL* __restrict__ a_s, REAL* __restrict__ c_s, 
+                     REAL* __restrict__ d_s, int solvedim, int numTrids, int size_g, 
+                     int regStoreSize, trid_mpi_handle &mpi_handle) {
   // Get sizes for each proc and the size of the reduced system
   int numProcs = mpi_handle.pdims[solvedim];
   int tmp = size_g / numProcs;
