@@ -137,8 +137,8 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
 
 // Will probably have to call each iteration separately as doubt you can make 
 // MPI calls in CUDA
-template <typename REAL>
-void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict__ cc_r, 
+template <typename REAL, int regStoreSize>
+void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r, 
                           REAL* __restrict__ dd_r, const int numTrids, const int reducedSize, 
                           const int solvedim, const int threadsPerTrid, const int nBlocks, 
                           const int nThreads, const int size_g, trid_mpi_handle &mpi_handle) {
@@ -166,7 +166,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   
   // Send and receive initial values
   getInitialValuesForPCR(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, numTrids, 
-                         threadsPerTrid, mpi_handle);
+                         threadsPerTrid, reducedSize, mpi_handle);
   
   // Perform initial step of PCR
   batched_trid_reduced_init_kernel<REAL><<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, 
@@ -177,8 +177,8 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
     int s = 1 << p;
     
     // Send and receive necessary values
-    getValuesForPCR<REAL>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, numTrids, size_g, 
-                          regStoreSize, s, mpi_handle);
+    getValuesForPCR<REAL, regStoreSize>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, 
+                                        numTrids, size_g, s, mpi_handle);
     
     // Run PCR step on GPU
     batched_trid_reduced_kernel<REAL><<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, 

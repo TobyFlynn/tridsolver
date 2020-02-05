@@ -3,6 +3,10 @@
 
 #include <cmath>
 
+#define ROUND_DOWN(N,step) (((N)/(step))*step)
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+#define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
+
 // TODO see if more efficient to zero array in chunks
 template<typename REAL>
 __global__ void zeroArray(int start, int count, REAL* __restrict__ array) {
@@ -60,7 +64,7 @@ template<typename REAL>
 void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
                             const REAL* __restrict__ d, REAL* __restrict__ a_s, 
                             REAL* __restrict__ c_s, REAL* __restrict__ d_s, int solvedim, 
-                            int numTrids, int threadsPerTrid, trid_mpi_handle &mpi_handle) {
+                            int numTrids, int threadsPerTrid, int reducedSize, trid_mpi_handle &mpi_handle) {
   // Buffer for a0, an, c0, cn, d0 and dn values for each trid system
   /*
    * sndbuf = | all 'a_0's | all 'c_0's | all 'd_0's | all 'a_n's | all 'c_n's | all 'd_n's |
@@ -308,11 +312,11 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
              cudaMemcpyHostToDevice);
 }
 
-template<typename REAL>
+template<typename REAL, int regStoreSize>
 void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
                      const REAL* __restrict__ d, REAL* __restrict__ a_s, REAL* __restrict__ c_s, 
                      REAL* __restrict__ d_s, int solvedim, int numTrids, int size_g, 
-                     int regStoreSize, int s, trid_mpi_handle &mpi_handle) {
+                     int s, trid_mpi_handle &mpi_handle) {
   // Get sizes for each proc and the size of the reduced system
   int numProcs = mpi_handle.pdims[solvedim];
   int tmp = size_g / numProcs;

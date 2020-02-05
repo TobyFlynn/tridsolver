@@ -54,7 +54,7 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
-    batched_trid_reduced<REAL>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
+    batched_trid_reduced<REAL, regStoreSize>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
                                nBlocks, nThreads, length, mpi_handle);
     
     // Call backwards pass
@@ -108,7 +108,7 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
-    batched_trid_reduced<REAL>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
+    batched_trid_reduced<REAL, regStoreSize>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
                                nBlocks, nThreads, length, mpi_handle);
     
     // Call backwards pass
@@ -162,7 +162,7 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
-    batched_trid_reduced<REAL>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
+    batched_trid_reduced<REAL, regStoreSize>(aa_r, cc_r, dd_r, numTrids, reducedSize, solvedim, threadsPerTrid, 
                                nBlocks, nThreads, length, mpi_handle);
     
     // Call backwards pass
