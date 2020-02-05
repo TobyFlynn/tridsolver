@@ -281,4 +281,43 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
                                       stride, batchSize, batchStride, regStoreSize);
 }
 
+template __device__ void loadStridedDataIntoRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize, 
+                                      const float blank);
+template __device__ void loadStridedDataIntoRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize, 
+                                      const double blank);
+
+template __device__ void storeStridedDataFromRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize);
+template __device__ void storeStridedDataFromRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize);
+
+template __global__ void batched_trid_forwards_kernel<float>(const float* __restrict__ a, 
+                                      const float* __restrict__ b, const float* __restrict__ c,
+                                      const float* __restrict__ d, float* __restrict__ aa, 
+                                      float* __restrict__ cc, float* __restrict__ dd, 
+                                      float* __restrict__ aa_r, float* __restrict__ cc_r, 
+                                      float* __restrict__ dd_r, const int length, 
+                                      const int stride, const int numTrids, 
+                                      const int batchSize, const int batchStride, 
+                                      const int regStoreSize, const int threadsPerTrid);
+
+template __global__ void batched_trid_forwards_kernel<double>(const double* __restrict__ a, 
+                                      const double* __restrict__ b, const double* __restrict__ c,
+                                      const double* __restrict__ d, double* __restrict__ aa, 
+                                      double* __restrict__ cc, double* __restrict__ dd, 
+                                      double* __restrict__ aa_r, double* __restrict__ cc_r, 
+                                      double* __restrict__ dd_r, const int length, 
+                                      const int stride, const int numTrids, 
+                                      const int batchSize, const int batchStride, 
+                                      const int regStoreSize, const int threadsPerTrid);
 #endif
