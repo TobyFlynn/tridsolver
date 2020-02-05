@@ -39,6 +39,17 @@ __device__ void storeDataFromRegisters(REAL *regArray,  REAL*  devArray, int tri
   }
 }
 
+template __device__ void loadDataIntoRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize, 
+                                      const float blank);
+template __device__ void loadDataIntoRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
+                                      int startElement, const int length, const int numTrids, 
+                                      const int stride, const int batchSize, 
+                                      const int batchStride, const int regStoreSize, 
+                                      const double blank);
+
 // Function that performs the modified Thomas forward pass on a GPU
 // Adapted from code written by Jeremy Appleyard (see trid_thomaspcr_large.hpp)
 template<typename REAL, int regStoreSize>
