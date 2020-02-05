@@ -48,9 +48,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
-    batched_trid_forwards_kernel<REAL><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
+    batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
-                                numTrids, batchSize, batchStride, regStoreSize, threadsPerTrid);
+                                numTrids, batchSize, batchStride, threadsPerTrid);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -59,13 +59,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call backwards pass
     if(INC) {
-      batched_trid_backwardsInc_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
+      batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     } else {
-      batched_trid_backwards_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
+      batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     }
     
     // Free memory
@@ -102,9 +102,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
-    batched_trid_forwards_kernel<REAL><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
+    batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
-                                numTrids, batchSize, batchStride, regStoreSize, threadsPerTrid);
+                                numTrids, batchSize, batchStride, threadsPerTrid);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -113,13 +113,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call backwards pass
     if(INC) {
-      batched_trid_backwardsInc_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
+      batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     } else {
-      batched_trid_backwards_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
+      batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     }
     
     // Free memory
@@ -156,9 +156,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
-    batched_trid_forwards_kernel<REAL><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
+    batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
-                                numTrids, batchSize, batchStride, regStoreSize, threadsPerTrid);
+                                numTrids, batchSize, batchStride, threadsPerTrid);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -167,13 +167,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     
     // Call backwards pass
     if(INC) {
-      batched_trid_backwardsInc_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
+      batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     } else {
-      batched_trid_backwards_kernel<REAL><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
+      batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
-                                                      batchStride, regStoreSize, threadsPerTrid);
+                                                      batchStride, threadsPerTrid);
     }
     
     // Free memory

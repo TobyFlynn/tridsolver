@@ -7,7 +7,7 @@
 
 // Function adapted from trid_thomaspcr_large.hpp
 template <typename REAL>
-__device__ void loadStridedDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
+__device__ void loadDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
                                       int startElement, const int length, const int numTrids, 
                                       const int stride, const int batchSize, 
                                       const int batchStride, const int regStoreSize, 
@@ -25,7 +25,7 @@ __device__ void loadStridedDataIntoRegisters(REAL *regArray,  REAL*  devArray, i
 }
 
 template<typename REAL>
-__device__ void storeStridedDataFromRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
+__device__ void storeDataFromRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
                                       int startElement, const int length, const int numTrids, 
                                       const int stride, const int batchSize, 
                                       const int batchStride, const int regStoreSize) {
@@ -41,7 +41,7 @@ __device__ void storeStridedDataFromRegisters(REAL *regArray,  REAL*  devArray, 
 
 // Function that performs the modified Thomas forward pass on a GPU
 // Adapted from code written by Jeremy Appleyard (see trid_thomaspcr_large.hpp)
-template<typename REAL>
+template<typename REAL, int regStoreSize>
 __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a, 
                                       const REAL* __restrict__ b, const REAL* __restrict__ c,
                                       const REAL* __restrict__ d, REAL* __restrict__ aa, 
@@ -50,7 +50,7 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
                                       REAL* __restrict__ dd_r, const int length, 
                                       const int stride, const int numTrids, 
                                       const int batchSize, const int batchStride, 
-                                      const int regStoreSize, const int threadsPerTrid) {
+                                      const int threadsPerTrid) {
   REAL a_reg[regStoreSize], b_reg[regStoreSize], c_reg[regStoreSize],
        d_reg[regStoreSize], aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize]; 
   REAL bbi;
@@ -60,16 +60,16 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
    
-  loadStridedDataIntoRegisters<REAL>(a_reg, a, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(a_reg, a, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)1.);
   
-  loadStridedDataIntoRegisters<REAL>(c_reg, c, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(c_reg, c, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(d_reg, d, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(d_reg, d, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
   // Reduce the system
@@ -125,13 +125,13 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   }
   
   // Store aa, cc and dd values
-  storeStridedDataFromRegisters<REAL>(aa_reg, aa, tridiag, startElement, length, numTrids, 
+  storeDataFromRegisters<REAL>(aa_reg, aa, tridiag, startElement, length, numTrids, 
                                       stride, batchSize, batchStride, regStoreSize);
   
-  storeStridedDataFromRegisters<REAL>(cc_reg, cc, tridiag, startElement, length, numTrids, 
+  storeDataFromRegisters<REAL>(cc_reg, cc, tridiag, startElement, length, numTrids, 
                                       stride, batchSize, batchStride, regStoreSize);
   
-  storeStridedDataFromRegisters<REAL>(dd_reg, dd, tridiag, startElement, length, numTrids, 
+  storeDataFromRegisters<REAL>(dd_reg, dd, tridiag, startElement, length, numTrids, 
                                       stride, batchSize, batchStride, regStoreSize);
 }
 
@@ -198,13 +198,13 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
   cudaFree(dd_r_s);
 }
 
-template<typename REAL>
+template<typename REAL, int regStoreSize>
 __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa, 
                                   const REAL* __restrict__ cc, const REAL* __restrict__ dd, 
                                   const REAL* __restrict__ dd_r, REAL* __restrict__ d, 
                                   const int length, const int stride, const int numTrids, 
                                   const int batchSize, const int batchStride, 
-                                  const int regStoreSize, const int threadsPerTrid) {
+                                  const int threadsPerTrid) {
   
   REAL aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize];
   REAL dd_0, dd_n;
@@ -214,13 +214,13 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadStridedDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
   int i = tridiag + numTrids * threadId_l * 2;
@@ -234,17 +234,17 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
     dd_reg[i] = dd_reg[i] - aa_reg[i] * dd_0 - cc_reg[i] * dd_n;
   }
   
-  storeStridedDataFromRegisters<REAL>(dd_reg, d, tridiag, startElement, length, numTrids, 
+  storeDataFromRegisters<REAL>(dd_reg, d, tridiag, startElement, length, numTrids, 
                                       stride, batchSize, batchStride, regStoreSize);
 }
 
-template<typename REAL>
+template<typename REAL, int regStoreSize>
 __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa, 
                                   const REAL* __restrict__ cc, const REAL* __restrict__ dd, 
                                   const REAL* __restrict__ dd_r, REAL* __restrict__ u, 
                                   const int length, const int stride, const int numTrids, 
                                   const int batchSize, const int batchStride, 
-                                  const int regStoreSize, const int threadsPerTrid) {
+                                  const int threadsPerTrid) {
   
   REAL aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize], u_reg[regStoreSize];
   REAL dd_0, dd_n;
@@ -254,16 +254,16 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadStridedDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
-  loadStridedDataIntoRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
   int i = tridiag + numTrids * threadId_l * 2;
@@ -277,47 +277,7 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
     u_reg[i] += dd_reg[i] - aa_reg[i] * dd_0 - cc_reg[i] * dd_n;
   }
   
-  storeStridedDataFromRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, 
+  storeDataFromRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, 
                                       stride, batchSize, batchStride, regStoreSize);
 }
-
-template __device__ void loadStridedDataIntoRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize, 
-                                      const float blank);
-template __device__ void loadStridedDataIntoRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize, 
-                                      const double blank);
-
-template __device__ void storeStridedDataFromRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize);
-template __device__ void storeStridedDataFromRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize);
-
-template __global__ void batched_trid_forwards_kernel<float>(const float* __restrict__ a, 
-                                      const float* __restrict__ b, const float* __restrict__ c,
-                                      const float* __restrict__ d, float* __restrict__ aa, 
-                                      float* __restrict__ cc, float* __restrict__ dd, 
-                                      float* __restrict__ aa_r, float* __restrict__ cc_r, 
-                                      float* __restrict__ dd_r, const int length, 
-                                      const int stride, const int numTrids, 
-                                      const int batchSize, const int batchStride, 
-                                      const int regStoreSize, const int threadsPerTrid);
-
-template __global__ void batched_trid_forwards_kernel<double>(const double* __restrict__ a, 
-                                      const double* __restrict__ b, const double* __restrict__ c,
-                                      const double* __restrict__ d, double* __restrict__ aa, 
-                                      double* __restrict__ cc, double* __restrict__ dd, 
-                                      double* __restrict__ aa_r, double* __restrict__ cc_r, 
-                                      double* __restrict__ dd_r, const int length, 
-                                      const int stride, const int numTrids, 
-                                      const int batchSize, const int batchStride, 
-                                      const int regStoreSize, const int threadsPerTrid);
 #endif
