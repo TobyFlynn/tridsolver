@@ -60,7 +60,7 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
    
-  loadDataIntoRegisters<REAL>(a_reg, a, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL>(&a_reg[0], a, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, regStoreSize, (REAL)0.);
   
   loadDataIntoRegisters<REAL>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
