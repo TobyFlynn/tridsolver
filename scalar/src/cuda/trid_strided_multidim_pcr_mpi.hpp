@@ -214,13 +214,13 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(aa_reg, aa, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(cc_reg, cc, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(dd_reg, dd, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
   int i = tridiag + numTrids * threadId_l * 2;
@@ -254,13 +254,13 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(aa_reg, aa, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(cc_reg, cc, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(dd_reg, dd, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
   loadDataIntoRegisters<REAL, regStoreSize>(u_reg, u, tridiag, startElement, length, numTrids, stride, 

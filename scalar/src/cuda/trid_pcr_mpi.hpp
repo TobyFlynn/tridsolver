@@ -94,7 +94,7 @@ __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __
   
   __syncthreads();
   
-  d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids]
+  d[i] = d[i] - a[i] * d[i] - c[i] * d[i + numTrids];
   
   i +=  numTrids;
   
