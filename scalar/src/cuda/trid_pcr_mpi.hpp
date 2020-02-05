@@ -8,7 +8,7 @@ __global__ void batched_trid_reduced_init_kernel(REAL* __restrict__ a,
                                       REAL* __restrict__  a_s, REAL* __restrict__ c_s, 
                                       REAL* __restrict__ d_s, int numTrids, int threadsPerTrid, 
                                       int reducedSize) {
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   
@@ -60,7 +60,7 @@ __global__ void batched_trid_reduced_kernel(REAL* __restrict__ a, REAL* __restri
                                             REAL* __restrict__ d, REAL* __restrict__  a_s, 
                                             REAL* __restrict__ c_s, REAL* __restrict__ d_s, 
                                             int numTrids, int threadsPerTrid, int reducedSize) {
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int i = tridiag + numTrids * threadId_l * 2;
@@ -79,7 +79,7 @@ template<typename REAL>
 __global__ void batched_trid_reduced_final_kernel(REAL* __restrict__ a, REAL* __restrict__ c, 
                                                   REAL* __restrict__ d, REAL* __restrict__ d_s, 
                                                   int numTrids, int threadsPerTrid) {
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int i = tridiag + numTrids * threadId_l * 2;

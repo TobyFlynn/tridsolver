@@ -10,7 +10,7 @@
 // TODO see if more efficient to zero array in chunks
 template<typename REAL>
 __global__ void zeroArray(int start, int count, REAL* __restrict__ array) {
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   if(threadId_g <= count) {
     array[start + threadId_g] = (REAL)0.0;
   }
@@ -18,7 +18,7 @@ __global__ void zeroArray(int start, int count, REAL* __restrict__ array) {
 
 template<typename REAL>
 void sendReducedMPI(int start, int count, int numTrids, int rank, const REAL* __restrict__ a, 
-                    const REAL* __restrict__ c, const REAL* __restrict__ d, REAL* sndbuf) {
+                    const REAL* __restrict__ c, const REAL* __restrict__ d, REAL* sndbuf, trid_mpi_handle &mpi_handle) {
   int array_start = start * numTrids;
   int array_count = count * numTrids;
   
@@ -38,8 +38,8 @@ void sendReducedMPI(int start, int count, int numTrids, int rank, const REAL* __
 }
 
 template<typename REAL>
-void receiveReducedMPI(int start, int count, int numTrids, int rank, const REAL* __restrict__ a, 
-                       const REAL* __restrict__ c, const REAL* __restrict__ d, REAL* rcvbuf) {
+void receiveReducedMPI(int start, int count, int numTrids, int rank, REAL* __restrict__ a, 
+                       REAL* __restrict__ c, REAL* __restrict__ d, REAL* rcvbuf, trid_mpi_handle &mpi_handle) {
   int array_start = start * numTrids;
   int array_count = count * numTrids;
   
@@ -381,9 +381,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       
       // Pack data into send buffer and send
       if(usedFirstSndBuf) {
-        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_2);
+        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_2, mpi_handle);
       } else {
-        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_1);
+        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_1, mpi_handle);
         usedFirstSndBuf = true;
       }
     }
@@ -421,7 +421,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       int count = end_l - start_l + 1;
       
       // Receive data and copy to arrays
-      receiveReducedMPI<REAL>(start_l, count, numTrids, src_rank, a_s, c_s, d_s, rcvbuf);
+      receiveReducedMPI<REAL>(start_l, count, numTrids, src_rank, a_s, c_s, d_s, rcvbuf, mpi_handle);
     }
   }
   
@@ -458,9 +458,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       
       // Pack data into send buffer and send
       if(usedFirstSndBuf) {
-        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_2);
+        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_2, mpi_handle);
       } else {
-        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_1);
+        sendReducedMPI<REAL>(start_l, count, numTrids, dst_rank, a, c, d, sndbuf_1, mpi_handle);
         usedFirstSndBuf = true;
       }
     }
@@ -495,7 +495,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       int count = end_l - start_l + 1;
       
       // Receive data and copy to arrays
-      receiveReducedMPI<REAL>(this_proc_reduced_size + start_l, count, numTrids, src_rank, a_s, c_s, d_s, rcvbuf);
+      receiveReducedMPI<REAL>(this_proc_reduced_size + start_l, count, numTrids, src_rank, a_s, c_s, d_s, rcvbuf, mpi_handle);
     }
   }
   
@@ -512,7 +512,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     
     int rcv_start_l = MAX(this_proc_start_g - rcv_start_g, 0);
     int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
-    int count = end_l - start_l + 1;
+    int count = rcv_end_l - rcv_start_l + 1;
     
     snd_start_l *= numTrids;
     rcv_start_l *= numTrids;
@@ -535,7 +535,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     
     int rcv_start_l = MAX(this_proc_start_g - rcv_start_g, 0);
     int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
-    int count = end_l - start_l + 1;
+    int count = rcv_end_l - rcv_start_l + 1;
     
     snd_start_l *= numTrids;
     rcv_start_l += this_proc_reduced_size;
@@ -558,9 +558,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     int nThreads = 512;
     int nBlocks = 1;
     if(numThreads < 512) {
-      nThreads = totalThreads;
+      nThreads = numThreads;
     } else {
-      nBlocks = (int)ceil((double)totalThreads / (double)nThreads);
+      nBlocks = (int)ceil((double)numThreads / (double)nThreads);
     }
     zeroArray<REAL><<<nBlocks,nThreads>>>(0, count * numTrids, a_s);
     zeroArray<REAL><<<nBlocks,nThreads>>>(0, count * numTrids, c_s);
@@ -582,9 +582,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     int nThreads = 512;
     int nBlocks = 1;
     if(numThreads < 512) {
-      nThreads = totalThreads;
+      nThreads = numThreads;
     } else {
-      nBlocks = (int)ceil((double)totalThreads / (double)nThreads);
+      nBlocks = (int)ceil((double)numThreads / (double)nThreads);
     }
     zeroArray<REAL><<<nBlocks,nThreads>>>(start, count * numTrids, a_s);
     zeroArray<REAL><<<nBlocks,nThreads>>>(start, count * numTrids, c_s);
