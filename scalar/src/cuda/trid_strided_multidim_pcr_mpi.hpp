@@ -6,12 +6,11 @@
 #include "trid_pcr_mpi_communication.hpp"
 
 // Function adapted from trid_thomaspcr_large.hpp
-template <typename REAL>
-__device__ void loadDataIntoRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
+template <typename REAL, int regStoreSize>
+__device__ void loadDataIntoRegisters(REAL *regArray,  const REAL*  devArray, int tridiag, 
                                       int startElement, const int length, const int numTrids, 
                                       const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize, 
-                                      const REAL blank) {
+                                      const int batchStride, const REAL blank) {
   for(int i = 0; i < regStoreSize; i++) {
     int element = startElement + i;
     int memLoc = (tridiag % batchSize) + (element * stride) + (tridiag / batchSize) * batchStride;
@@ -39,17 +38,6 @@ __device__ void storeDataFromRegisters(REAL *regArray,  REAL*  devArray, int tri
   }
 }
 
-template __device__ void loadDataIntoRegisters<float>(float *regArray,  float*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize, 
-                                      const float blank);
-template __device__ void loadDataIntoRegisters<double>(double *regArray,  double*  devArray, int tridiag, 
-                                      int startElement, const int length, const int numTrids, 
-                                      const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize, 
-                                      const double blank);
-
 // Function that performs the modified Thomas forward pass on a GPU
 // Adapted from code written by Jeremy Appleyard (see trid_thomaspcr_large.hpp)
 template<typename REAL, int regStoreSize>
@@ -71,17 +59,17 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
    
-  loadDataIntoRegisters<REAL>(&a_reg[0], a, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(&a_reg[0], a, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)1.);
+  loadDataIntoRegisters<REAL, regStoreSize>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)1.);
   
-  loadDataIntoRegisters<REAL>(c_reg, c, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, c, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(d_reg, d, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, d, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
   // Reduce the system
   if (regStoreSize >= 2) {
