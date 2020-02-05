@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "trid_pcr_mpi_communication.hpp"
+#include "trid_pcr_mpi.hpp"
 
 // Function adapted from trid_thomaspcr_large.hpp
 template <typename REAL, int regStoreSize>
@@ -23,11 +24,11 @@ __device__ void loadDataIntoRegisters(REAL *regArray,  const REAL*  devArray, in
   }
 }
 
-template<typename REAL>
+template<typename REAL, int regStoreSize>
 __device__ void storeDataFromRegisters(REAL *regArray,  REAL*  devArray, int tridiag, 
                                       int startElement, const int length, const int numTrids, 
                                       const int stride, const int batchSize, 
-                                      const int batchStride, const int regStoreSize) {
+                                      const int batchStride) {
   for(int i = 0; i < regStoreSize; i++) {
     int element = startElement + i;
     int memLoc = (tridiag % batchSize) + (element * stride) + (tridiag / batchSize) * batchStride;
@@ -59,7 +60,7 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
    
-  loadDataIntoRegisters<REAL, regStoreSize>(&a_reg[0], a, tridiag, startElement, length, numTrids, stride, 
+  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, a, tridiag, startElement, length, numTrids, stride, 
                                      batchSize, batchStride, (REAL)0.);
   
   loadDataIntoRegisters<REAL, regStoreSize>(b_reg, b, tridiag, startElement, length, numTrids, stride, 
@@ -124,14 +125,14 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
   }
   
   // Store aa, cc and dd values
-  storeDataFromRegisters<REAL>(aa_reg, aa, tridiag, startElement, length, numTrids, 
-                                      stride, batchSize, batchStride, regStoreSize);
+  storeDataFromRegisters<REAL, regStoreSize>(aa_reg, aa, tridiag, startElement, length, numTrids, 
+                                      stride, batchSize, batchStride);
   
-  storeDataFromRegisters<REAL>(cc_reg, cc, tridiag, startElement, length, numTrids, 
-                                      stride, batchSize, batchStride, regStoreSize);
+  storeDataFromRegisters<REAL, regStoreSize>(cc_reg, cc, tridiag, startElement, length, numTrids, 
+                                      stride, batchSize, batchStride);
   
-  storeDataFromRegisters<REAL>(dd_reg, dd, tridiag, startElement, length, numTrids, 
-                                      stride, batchSize, batchStride, regStoreSize);
+  storeDataFromRegisters<REAL, regStoreSize>(dd_reg, dd, tridiag, startElement, length, numTrids, 
+                                      stride, batchSize, batchStride);
 }
 
 // Will probably have to call each iteration separately as doubt you can make 
@@ -149,7 +150,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
     MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.z_comm);
   }
   // Number of iterations for PCR
-  int P = (int)ceil(log2(reducedSize_g));
+  int P = (int)ceil(log2((REAL)reducedSize_g));
   // Need arrays to store values from other MPI procs
   REAL *aa_r_s = NULL;
   REAL *cc_r_s = NULL;
@@ -177,7 +178,7 @@ void batched_trid_reduced(const REAL* __restrict__ aa_r, const REAL* __restrict_
     
     // Send and receive necessary values
     getValuesForPCR<REAL>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, dd_r_s, solvedim, numTrids, size_g, 
-                          regStoreSize, mpi_handle);
+                          regStoreSize, s, mpi_handle);
     
     // Run PCR step on GPU
     batched_trid_reduced_kernel<REAL><<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, 
@@ -213,14 +214,14 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
   int i = tridiag + numTrids * threadId_l * 2;
   dd_0 = dd_r[i];
@@ -233,8 +234,8 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
     dd_reg[i] = dd_reg[i] - aa_reg[i] * dd_0 - cc_reg[i] * dd_n;
   }
   
-  storeDataFromRegisters<REAL>(dd_reg, d, tridiag, startElement, length, numTrids, 
-                                      stride, batchSize, batchStride, regStoreSize);
+  storeDataFromRegisters<REAL, regStoreSize>(dd_reg, d, tridiag, startElement, length, numTrids, 
+                                      stride, batchSize, batchStride);
 }
 
 template<typename REAL, int regStoreSize>
@@ -253,17 +254,17 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
   
-  loadDataIntoRegisters<REAL>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(a_reg, aa, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(c_reg, cc, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(d_reg, dd, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
-  loadDataIntoRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, stride, 
-                                     batchSize, batchStride, regStoreSize, (REAL)0.);
+  loadDataIntoRegisters<REAL, regStoreSize>(u_reg, u, tridiag, startElement, length, numTrids, stride, 
+                                     batchSize, batchStride, (REAL)0.);
   
   int i = tridiag + numTrids * threadId_l * 2;
   dd_0 = dd_r[i];
@@ -276,7 +277,7 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
     u_reg[i] += dd_reg[i] - aa_reg[i] * dd_0 - cc_reg[i] * dd_n;
   }
   
-  storeDataFromRegisters<REAL>(u_reg, u, tridiag, startElement, length, numTrids, 
-                                      stride, batchSize, batchStride, regStoreSize);
+  storeDataFromRegisters<REAL, regStoreSize>(u_reg, u, tridiag, startElement, length, numTrids, 
+                                      stride, batchSize, batchStride);
 }
 #endif

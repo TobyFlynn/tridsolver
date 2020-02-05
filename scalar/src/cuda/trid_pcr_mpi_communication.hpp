@@ -312,7 +312,7 @@ template<typename REAL>
 void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
                      const REAL* __restrict__ d, REAL* __restrict__ a_s, REAL* __restrict__ c_s, 
                      REAL* __restrict__ d_s, int solvedim, int numTrids, int size_g, 
-                     int regStoreSize, trid_mpi_handle &mpi_handle) {
+                     int regStoreSize, int s, trid_mpi_handle &mpi_handle) {
   // Get sizes for each proc and the size of the reduced system
   int numProcs = mpi_handle.pdims[solvedim];
   int tmp = size_g / numProcs;
