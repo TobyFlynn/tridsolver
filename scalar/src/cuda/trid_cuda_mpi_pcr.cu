@@ -20,13 +20,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   
   if(solvedim == 0) {
     // Call forwards pass
-    int numTrids = handle.size[1] * handle.size[2];
-    int length = handle.size[0];
-    int stride = 1;
-    int batchSize = 1;
-    int batchStride = handle.pads[0];
-    int regStoreSize = 8;
-    int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
+    const int numTrids = handle.size[1] * handle.size[2];
+    const int length = handle.size[0];
+    const int stride = 1;
+    const int batchSize = 1;
+    const int batchStride = handle.pads[0];
+    const int regStoreSize = 8;
+    const int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
     
     // Work out number of blocks and threads needed
     int totalThreads = threadsPerTrid * numTrids;
@@ -74,13 +74,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaFree(dd_r);
   } else if(solvedim == 1) {
     // Call forwards pass
-    int numTrids = handle.size[0] * handle.size[2];
-    int length = handle.size[1];
-    int stride = handle.pads[0];
-    int batchSize = handle.size[0];
-    int batchStride = handle.pads[0] * handle.size[1];
-    int regStoreSize = 8;
-    int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
+    const int numTrids = handle.size[0] * handle.size[2];
+    const int length = handle.size[1];
+    const int stride = handle.pads[0];
+    const int batchSize = handle.size[0];
+    const int batchStride = handle.pads[0] * handle.size[1];
+    const int regStoreSize = 8;
+    const int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
     
     // Work out number of blocks and threads needed
     int totalThreads = threadsPerTrid * numTrids;
@@ -128,13 +128,13 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaFree(dd_r);
   } else if(solvedim == 2) {
     // Call forwards pass
-    int numTrids = handle.size[0] * handle.size[1];
-    int length = handle.size[2];
-    int stride = handle.pads[0] * handle.size[1];
-    int batchSize = handle.size[0];
-    int batchStride = handle.pads[0];
-    int regStoreSize = 8;
-    int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
+    const int numTrids = handle.size[0] * handle.size[1];
+    const int length = handle.size[2];
+    const int stride = handle.pads[0] * handle.size[1];
+    const int batchSize = handle.size[0];
+    const int batchStride = handle.pads[0];
+    const int regStoreSize = 8;
+    const int threadsPerTrid = (int)ceil((double)length / (double)regStoreSize);
     
     // Work out number of blocks and threads needed
     int totalThreads = threadsPerTrid * numTrids;

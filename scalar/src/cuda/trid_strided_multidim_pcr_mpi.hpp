@@ -55,7 +55,7 @@ __global__ void batched_trid_forwards_kernel(const REAL* __restrict__ a,
        d_reg[regStoreSize], aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize]; 
   REAL bbi;
   
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
@@ -209,7 +209,7 @@ __global__ void batched_trid_backwards_kernel(const REAL* __restrict__ aa,
   REAL aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize];
   REAL dd_0, dd_n;
   
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
@@ -249,7 +249,7 @@ __global__ void batched_trid_backwardsInc_kernel(const REAL* __restrict__ aa,
   REAL aa_reg[regStoreSize], cc_reg[regStoreSize], dd_reg[regStoreSize], u_reg[regStoreSize];
   REAL dd_0, dd_n;
   
-  int threadId_g = (blockIdx.x * nThreads) + threadIdx.x;
+  int threadId_g = (blockIdx.x * blockDim.x) + threadIdx.x;
   int tridiag = threadId_g / threadsPerTrid;
   int threadId_l = (threadId_g - (tridiag * threadsPerTrid));
   int startElement = threadId_l * regStoreSize;
