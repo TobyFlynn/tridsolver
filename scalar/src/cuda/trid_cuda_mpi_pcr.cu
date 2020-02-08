@@ -3,6 +3,139 @@
 
 #include <cmath>
 
+void setStartEnd(int *start, int *end, int coord, int numProcs, int numElements) {
+  int tmp = numElements / numProcs;
+  int remainder = numElements % numProcs;
+  int total = 0;
+  for(int i = 0; i < coord; i++) {
+    if(i < remainder) {
+      total += tmp + 1;
+    } else {
+      total += tmp;
+    }
+  }
+  *start = total;
+  if(coord < remainder) {
+    *end = *start + tmp;
+  } else {
+    *end = *start + tmp -1;
+  }
+}
+
+template<typename REAL>
+void tridMultiDimBatchPCRInitMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi_handle, 
+                                 int ndim, int *size) {
+  // Get number of mpi procs and the rank of this mpi proc
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_handle.procs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_handle.rank);
+  
+  // Split into multi dim arrangement of mpi procs
+  handle.ndim = ndim;
+  mpi_handle.pdims    = (int *) calloc(handle.ndim, sizeof(int));
+  mpi_handle.periodic = (int *) calloc(handle.ndim, sizeof(int)); //false
+  mpi_handle.coords   = (int *) calloc(handle.ndim, sizeof(int));
+  MPI_Dims_create(mpi_handle.procs, handle.ndim, mpi_handle.pdims);
+  
+  // Create cartecian mpi comm
+  MPI_Cart_create(MPI_COMM_WORLD, handle.ndim, mpi_handle.pdims, mpi_handle.periodic, 0,  &mpi_handle.comm);
+  
+  // Get rand and coord of current mpi proc
+  MPI_Comm_rank(mpi_handle.comm, &mpi_handle.my_cart_rank);
+  MPI_Cart_coords(mpi_handle.comm, mpi_handle.my_cart_rank, handle.ndim, mpi_handle.coords);
+  
+  // TODO extend to other dimensions
+  // Create separate comms for x, y and z dimensions
+  int free_coords[3];
+  free_coords[0] = 1;
+  free_coords[1] = 0;
+  free_coords[2] = 0;
+  MPI_Cart_sub(mpi_handle.comm, free_coords, &mpi_handle.x_comm);
+  MPI_Comm y_comm;
+  free_coords[0] = 0;
+  free_coords[1] = 1;
+  free_coords[2] = 0;
+  MPI_Cart_sub(mpi_handle.comm, free_coords, &mpi_handle.y_comm);
+  MPI_Comm z_comm;
+  free_coords[0] = 0;
+  free_coords[1] = 0;
+  free_coords[2] = 1;
+  MPI_Cart_sub(mpi_handle.comm, free_coords, &mpi_handle.z_comm);
+  
+  // Store the global problem sizes
+  handle.size_g = (int *) calloc(handle.ndim, sizeof(int));
+  for(int i = 0; i < handle.ndim; i++) {
+    handle.size_g[i] = size[i];
+  }
+  
+  // Calculate size, padding, start and end for each dimension
+  handle.size    = (int *) calloc(handle.ndim, sizeof(int));
+  handle.pads    = (int *) calloc(handle.ndim, sizeof(int));
+  handle.start_g = (int *) calloc(handle.ndim, sizeof(int));
+  handle.end_g   = (int *) calloc(handle.ndim, sizeof(int));
+  
+  for(int i = 0; i < handle.ndim; i++) {
+    setStartEnd(&handle.start_g[i], &handle.end_g[i], mpi_handle.coords[i], mpi_handle.pdims[i], 
+                handle.size_g[i]);
+    
+    handle.size[i]    = handle.end_g[i] - handle.start_g[i] + 1;
+    
+    // Only pad the x dimension
+    if(i == 0) {
+      handle.pads[i] = (1 + ((handle.size[i] - 1) / SIMD_VEC)) * SIMD_VEC;
+    } else {
+      handle.pads[i] = handle.size[i];
+    }
+  }
+  
+  // Allocate memory for arrays
+  int mem_size = sizeof(REAL);
+  for(int i = 0; i < handle.ndim; i++) {
+    mem_size *= handle.pads[i];
+  }
+  
+  cudaMalloc(&handle.a, mem_size);
+  cudaMalloc(&handle.b, mem_size);
+  cudaMalloc(&handle.c, mem_size);
+  cudaMalloc(&handle.du, mem_size);
+  cudaMalloc(&handle.h_u, mem_size);
+  
+  // Calculate reduced system sizes for each dimension
+  handle.sys_len_l = (int *) calloc(handle.ndim, sizeof(int));
+  handle.n_sys_g = (int *) calloc(handle.ndim, sizeof(int));
+  handle.n_sys_l = (int *) calloc(handle.ndim, sizeof(int));
+  
+  for(int i = 0; i < handle.ndim; i++) {
+    handle.sys_len_l[i] = mpi_handle.pdims[i] * 2;
+    handle.n_sys_g[i] = 1;
+    handle.n_sys_l[i] = 1;
+    for(int j = 0; j < handle.ndim; j++) {
+      if(j != i) {
+        handle.n_sys_g[i] *= handle.size[j];
+        handle.n_sys_l[i] *= handle.size[j];
+      }
+    }
+  }
+}
+
+template<typename REAL>
+void tridMultiDimBatchPCRCleanMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi_handle) {
+  free(mpi_handle.pdims);
+  free(mpi_handle.periodic);
+  free(mpi_handle.coords);
+  free(handle.size_g);
+  free(handle.size);
+  free(handle.start_g);
+  free(handle.end_g);
+  free(handle.sys_len_l);
+  free(handle.n_sys_g);
+  free(handle.n_sys_l);
+  cudaFree(&handle.a);
+  cudaFree(&handle.b);
+  cudaFree(&handle.c);
+  cudaFree(&handle.du);
+  cudaFree(&handle.h_u);
+}
+
 template<typename REAL, int INC>
 void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi_handle, 
                                   int solvedim) {
@@ -182,6 +315,18 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     cudaFree(dd_r);
   }
 }
+
+template void tridMultiDimBatchPCRInitMPI<float>(trid_handle<float> &handle, 
+                                              trid_mpi_handle &mpi_handle, int ndim, int *size);
+
+template void tridMultiDimBatchPCRInitMPI<double>(trid_handle<double> &handle, 
+                                              trid_mpi_handle &mpi_handle, int ndim, int *size);
+
+template void tridMultiDimBatchPCRCleanMPI<float>(trid_handle<float> &handle, 
+                                                  trid_mpi_handle &mpi_handle);
+
+template void tridMultiDimBatchPCRCleanMPI<double>(trid_handle<double> &handle, 
+                                                   trid_mpi_handle &mpi_handle);
 
 template void tridMultiDimBatchPCRSolveMPI<float, 0>(trid_handle<float> &handle, 
                                                      trid_mpi_handle &mpi_handle, int solvedim);
