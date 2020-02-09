@@ -210,12 +210,20 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
   
   free(h_u);
   
-  pre_handle.halo_snd_x = (FP*) malloc(2 * trid_handle.size[1] * trid_handle.size[2] * sizeof(FP));
-  pre_handle.halo_rcv_x = (FP*) malloc(2 * trid_handle.size[1] * trid_handle.size[2] * sizeof(FP));
-  pre_handle.halo_snd_y = (FP*) malloc(2 * trid_handle.size[0] * trid_handle.size[2] * sizeof(FP));
-  pre_handle.halo_rcv_y = (FP*) malloc(2 * trid_handle.size[0] * trid_handle.size[2] * sizeof(FP));
-  pre_handle.halo_snd_z = (FP*) malloc(2 * trid_handle.size[1] * trid_handle.size[0] * sizeof(FP));
-  pre_handle.halo_rcv_z = (FP*) malloc(2 * trid_handle.size[1] * trid_handle.size[0] * sizeof(FP));
+  pre_handle.rcv_size_x = 2 * trid_handle.size[1] * trid_handle.size[2];
+  pre_handle.rcv_size_y = 2 * trid_handle.size[0] * trid_handle.size[2];
+  pre_handle.rcv_size_z = 2 * trid_handle.size[1] * trid_handle.size[0];
+  
+  pre_handle.halo_snd_x = (FP*) malloc(pre_handle.rcv_size_x * sizeof(FP));
+  pre_handle.halo_rcv_x = (FP*) malloc(pre_handle.rcv_size_x * sizeof(FP));
+  pre_handle.halo_snd_y = (FP*) malloc(pre_handle.rcv_size_y * sizeof(FP));
+  pre_handle.halo_rcv_y = (FP*) malloc(pre_handle.rcv_size_y * sizeof(FP));
+  pre_handle.halo_snd_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
+  pre_handle.halo_rcv_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
+  
+  cudaMalloc(&pre_handle.rcv_x, pre_handle.rcv_size_x * sizeof(FP));
+  cudaMalloc(&pre_handle.rcv_y, pre_handle.rcv_size_y * sizeof(FP));
+  cudaMalloc(&pre_handle.rcv_z, pre_handle.rcv_size_z * sizeof(FP));
 
   return 0;
 
@@ -229,6 +237,9 @@ void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc
   _mm_free(pre_handle.halo_rcv_y);
   _mm_free(pre_handle.halo_snd_z);
   _mm_free(pre_handle.halo_rcv_z);
+  cudaFree(&pre_handle.rcv_x);
+  cudaFree(&pre_handle.rcv_y);
+  cudaFree(&pre_handle.rcv_z);
 }
 
 int main(int argc, char* argv[]) {
@@ -269,9 +280,8 @@ int main(int argc, char* argv[]) {
   for(int it = 0; it < iter; it++) {
     
     timing_start(&timer);
-    // TODO
-    preproc_mpi<FP>(pre_handle, trid_handle.h_u, trid_handle.du, trid_handle.a,
-                    trid_handle.b, trid_handle.c, trid_handle, mpi_handle);
+    
+    preproc_mpi_cuda<FP>(pre_handle, trid_handle, mpi_handle);
     
     timing_end(&timer, &elapsed_preproc);
 

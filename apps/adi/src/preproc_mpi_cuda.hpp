@@ -46,17 +46,94 @@ struct preproc_handle {
   REAL *halo_snd_z;
   REAL *halo_rcv_z;
   
+  REAL *rcv_x;
+  REAL *rcv_y;
+  REAL *rcv_z;
+  
+  int rcv_size_x;
+  int rcv_size_y;
+  int rcv_size_z;
+  
   REAL lambda;
 };
 
 template<typename REAL>
-__global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, REAL *du, REAL *h_u, REAL *rcv_x, REAL *rcv_y, REAL *rcv_z, int nx, int ny, int nz) {
+__global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, REAL *du, REAL *u, REAL *rcv_x, REAL *rcv_y, REAL *rcv_z, int xpad, int *start_g, int *end_g, int *size_g, int *size) {
+  int nx = size[0];
+  int ny = size[1];
+  int nz = size[2];
+  
   int i   = threadIdx.x + blockIdx.x*blockDim.x;
   int j   = threadIdx.y + blockIdx.y*blockDim.y;
   int ind = i + j*nx; 
 
   // Is the thread in active region?
   int active = (i<nx) && (j<ny);
+  
+  REAL ux_1, ux_2, uy_1, uy_2, uz_1, uz_2;
+  
+  for(k=0; k<nz; k++) {
+    if(active) {
+      if( (start_g[0]==0 && i==0) || 
+          (end_g[0]==size_g[0]-1 && i==size[0]-1) ||
+          (start_g[1]==0 && j==0) || 
+          (end_g[1]==size_g[1]-1 && j==size[1]-1) ||
+          (start_g[2]==0 && k==0) || 
+          (end_g[2]==size_g[2]-1 && k==size[2]-1)) {
+
+          du[ind] = 0.0f; // Dirichlet b.c.'s
+          a[ind] = 0.0f;
+          b[ind] = 1.0f;
+          c[ind] = 0.0f;
+        } else {
+          if(i == 0) {
+            ux_1 = rcv_x[1*nz*ny + k*ny + j];
+          } else {
+            ux_1 = u[ind - 1];
+          }
+          
+          if(i == nx - 1) {
+            ux_2 = rcv_x[0*nz*ny + k*ny + j];
+          } else {
+            ux_2 = u[ind + 1];
+          }
+          
+          if(j == 0) {
+            uy_1 = rcv_y[1*nz*nx + k*nx + i];
+          } else {
+            uy_1 = u[ind - padx];
+          }
+          
+          if(j == ny - 1) {
+            uy_2 = rcv_y[0*nz*nx + k*nx + i];
+          } else {
+            uy_2 = u[ind + padx];
+          }
+          
+          if(k == 0) {
+            uz_1 = rcv_z[1*ny*nx + j*nx + i];
+          } else {
+            uz_1 = u[ind - padx*pady];
+          }
+          
+          if(k == nz - 1) {
+            uz_2 = rcv_z[0*ny*nx + j*nx + i];
+          } else {
+            uz_2 = u[ind + padx*pady];
+          }
+          
+          du[ind] = lambda*( ux_1 + ux_2
+                           + uy_1 + uy_2
+                           + uz_1 + uz_2
+                           - 6.0f * u[ind]);
+
+          a[ind] = -0.5f * lambda;
+          b[ind] =  1.0f + lambda;
+          c[ind] = -0.5f * lambda;
+        }
+      ind += nx*ny;
+    }
+  }
 }
 
 template<typename REAL>
@@ -272,75 +349,21 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
   free(u);
   
   //timing_end(app.prof, &timer, &app.elapsed_time[9], app.elapsed_name[9]);
-
-  REAL tmp, ux_1, ux_2, uy_1, uy_2, uz_1, uz_2;
-
-  //timing_start(app.prof, &timer);
-  for(k = 0; k < nz; k++) {
-    for(j = 0; j < ny; j++) {
-      for(i = 0; i < nx; i++) {   // i loop innermost for sequential memory access
-        ind = k*padx*pady + j*padx + i;
-        if( (trid_handle.start_g[0]==0 && i==0) || 
-            (trid_handle.end_g[0]==trid_handle.size_g[0]-1 && i==trid_handle.size[0]-1) ||
-            (trid_handle.start_g[1]==0 && j==0) || 
-            (trid_handle.end_g[1]==trid_handle.size_g[1]-1 && j==trid_handle.size[1]-1) ||
-            (trid_handle.start_g[2]==0 && k==0) || 
-            (trid_handle.end_g[2]==trid_handle.size_g[2]-1 && k==trid_handle.size[2]-1)) {
-
-          du[ind] = 0.0f; // Dirichlet b.c.'s
-          a[ind] = 0.0f;
-          b[ind] = 1.0f;
-          c[ind] = 0.0f;
-        }
-        else {
-          
-          if(i == 0) {
-            ux_1 = pre_handle.halo_rcv_x[1*nz*ny + k*ny + j];
-          } else {
-            ux_1 = u[ind - 1];
-          }
-          
-          if(i == nx - 1) {
-            ux_2 = pre_handle.halo_rcv_x[0*nz*ny + k*ny + j];
-          } else {
-            ux_2 = u[ind + 1];
-          }
-          
-          if(j == 0) {
-            uy_1 = pre_handle.halo_rcv_y[1*nz*nx + k*nx + i];
-          } else {
-            uy_1 = u[ind - padx];
-          }
-          
-          if(j == ny - 1) {
-            uy_2 = pre_handle.halo_rcv_y[0*nz*nx + k*nx + i];
-          } else {
-            uy_2 = u[ind + padx];
-          }
-          
-          if(k == 0) {
-            uz_1 = pre_handle.halo_rcv_z[1*ny*nx + j*nx + i];
-          } else {
-            uz_1 = u[ind - padx*pady];
-          }
-          
-          if(k == nz - 1) {
-            uz_2 = pre_handle.halo_rcv_z[0*ny*nx + j*nx + i];
-          } else {
-            uz_2 = u[ind + padx*pady];
-          }
-          
-          du[ind] = pre_handle.lambda*( ux_1 + ux_2
-                                + uy_1 + uy_2
-                                + uz_1 + uz_2
-                                - 6.0f * u[ind]);
-
-          a[ind] = -0.5f * pre_handle.lambda;
-          b[ind] =  1.0f + pre_handle.lambda;
-          c[ind] = -0.5f * pre_handle.lambda;
-        }
-      }
-    }
-  }
+  
+  cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * rcv_size_x, 
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * rcv_size_y, 
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * rcv_size_z, 
+             cudaMemcpyHostToDevice);
+  
+  dim3 dimGrid1(1+(nx-1)/32, 1+(ny-1)/4);
+  dim3 dimBlock1(32,4);
+  
+  preproc_mpi_cuda_kernel<<<dimGrid1, dimBlock1>>>(pre_handle.lambda, trid_handle.a, 
+                  trid_handle.b, trid_handle.c, trid_handle.du, trid_handle.h_u, 
+                  pre_handle.rcv_x, pre_handle.rcv_y, pre_handle.rcv_z, trid_handle.pads[0], 
+                  trid_handle.start_g, trid_handle.end_g, trid_handle.size_g, trid_handle.size);
+  
   //timing_end(app.prof, &timer, &app.elapsed_time[10], app.elapsed_name[10]);
 }
