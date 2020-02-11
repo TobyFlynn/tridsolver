@@ -221,9 +221,9 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
   pre_handle.halo_snd_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
   pre_handle.halo_rcv_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
   
-  cudaMalloc(&pre_handle.rcv_x, pre_handle.rcv_size_x * sizeof(FP));
-  cudaMalloc(&pre_handle.rcv_y, pre_handle.rcv_size_y * sizeof(FP));
-  cudaMalloc(&pre_handle.rcv_z, pre_handle.rcv_size_z * sizeof(FP));
+  cudaMalloc((void **)&pre_handle.rcv_x, pre_handle.rcv_size_x * sizeof(FP));
+  cudaMalloc((void **)&pre_handle.rcv_y, pre_handle.rcv_size_y * sizeof(FP));
+  cudaMalloc((void **)&pre_handle.rcv_z, pre_handle.rcv_size_z * sizeof(FP));
 
   return 0;
 
@@ -237,9 +237,9 @@ void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc
   _mm_free(pre_handle.halo_rcv_y);
   _mm_free(pre_handle.halo_snd_z);
   _mm_free(pre_handle.halo_rcv_z);
-  cudaFree(&pre_handle.rcv_x);
-  cudaFree(&pre_handle.rcv_y);
-  cudaFree(&pre_handle.rcv_z);
+  cudaFree(pre_handle.rcv_x);
+  cudaFree(pre_handle.rcv_y);
+  cudaFree(pre_handle.rcv_z);
 }
 
 int main(int argc, char* argv[]) {

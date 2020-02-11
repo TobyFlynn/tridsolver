@@ -93,11 +93,11 @@ void tridMultiDimBatchPCRInitMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi
     mem_size *= handle.pads[i];
   }
   
-  cudaMalloc(&handle.a, mem_size);
-  cudaMalloc(&handle.b, mem_size);
-  cudaMalloc(&handle.c, mem_size);
-  cudaMalloc(&handle.du, mem_size);
-  cudaMalloc(&handle.h_u, mem_size);
+  cudaMalloc((void **)&handle.a, mem_size);
+  cudaMalloc((void **)&handle.b, mem_size);
+  cudaMalloc((void **)&handle.c, mem_size);
+  cudaMalloc((void **)&handle.du, mem_size);
+  cudaMalloc((void **)&handle.h_u, mem_size);
   
   // Calculate reduced system sizes for each dimension
   handle.sys_len_l = (int *) calloc(handle.ndim, sizeof(int));
@@ -129,11 +129,11 @@ void tridMultiDimBatchPCRCleanMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   free(handle.sys_len_l);
   free(handle.n_sys_g);
   free(handle.n_sys_l);
-  cudaFree(&handle.a);
-  cudaFree(&handle.b);
-  cudaFree(&handle.c);
-  cudaFree(&handle.du);
-  cudaFree(&handle.h_u);
+  cudaFree(handle.a);
+  cudaFree(handle.b);
+  cudaFree(handle.c);
+  cudaFree(handle.du);
+  cudaFree(handle.h_u);
 }
 
 template<typename REAL, int INC>
@@ -145,9 +145,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   REAL *aa = NULL;
   REAL *cc = NULL;
   REAL *dd = NULL;
-  cudaMalloc(&aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
-  cudaMalloc(&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
-  cudaMalloc(&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaMalloc((void **)&aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaMalloc((void **)&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaMalloc((void **)&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
   
   // TODO Copy memory from Host to GPU
   
@@ -176,9 +176,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc(&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
@@ -230,9 +230,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc(&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
@@ -284,9 +284,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc(&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc(&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 

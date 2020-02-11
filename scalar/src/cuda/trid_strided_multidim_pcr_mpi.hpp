@@ -155,9 +155,9 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
   REAL *aa_r_s = NULL;
   REAL *cc_r_s = NULL;
   REAL *dd_r_s = NULL;
-  cudaMalloc(&aa_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
-  cudaMalloc(&cc_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
-  cudaMalloc(&dd_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
+  cudaMalloc((void **)&aa_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
+  cudaMalloc((void **)&cc_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
+  cudaMalloc((void **)&dd_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
   
   // Needed for initial and final PCR stages as trid systems cannot be split across multiple blocks
   // in order to prevent race conditions
