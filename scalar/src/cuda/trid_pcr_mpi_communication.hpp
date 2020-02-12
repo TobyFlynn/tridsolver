@@ -2,6 +2,7 @@
 #define TRID_GPU_MPI_PCR_COMM__
 
 #include <cmath>
+#include <type_traits>
 
 #define ROUND_DOWN(N,step) (((N)/(step))*step)
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -70,7 +71,7 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
    * sndbuf = | all 'a_0's | all 'c_0's | all 'd_0's | all 'a_n's | all 'c_n's | all 'd_n's |
    */
   REAL *sndbuf = (REAL *) malloc(3 * 2 * numTrids * sizeof(REAL));
-  REAL *rcvbuf = (REAL *) calloc(3 * 2 * numTrids * sizeof(REAL));
+  REAL *rcvbuf = (REAL *) calloc(3 * 2 * numTrids, sizeof(REAL));
   
   cudaMemcpy(&sndbuf[0], &a[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
   cudaMemcpy(&sndbuf[3 * numTrids], &a[numTrids * (threadsPerTrid * 2 - 1)], 
@@ -601,7 +602,7 @@ template<typename REAL>
 void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
                           int solvedim, int numTrids, trid_mpi_handle &mpi_handle) {
   REAL *sndbuf = (REAL *) malloc(numTrids * sizeof(REAL));
-  REAL *rcvbuf = (REAL *) calloc(numTrids * sizeof(REAL));
+  REAL *rcvbuf = (REAL *) calloc(numTrids, sizeof(REAL));
   
   cudaMemcpy(&sndbuf[0], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
   

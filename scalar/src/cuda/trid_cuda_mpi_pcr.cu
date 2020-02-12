@@ -81,7 +81,9 @@ void tridMultiDimBatchPCRInitMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi
     
     // Only pad the x dimension
     if(i == 0) {
-      handle.pads[i] = (1 + ((handle.size[i] - 1) / SIMD_VEC)) * SIMD_VEC;
+      // TODO see what padding is needed for GPU
+      //handle.pads[i] = (1 + ((handle.size[i] - 1) / SIMD_VEC)) * SIMD_VEC;
+      handle.pads[i] = handle.size[i];
     } else {
       handle.pads[i] = handle.size[i];
     }
