@@ -46,7 +46,7 @@ if (INTEL_CC)
 	set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_RELEASE}		 	${FLAGS_INTEL_RELEASE}") 
 else (INTEL_CC) 
   # Set compiler flags/options for GCC compiler
-  set(FLAGS_GCC_DEFAULT "-march=native -fopenmp") #-march=core-avx2
+  set(FLAGS_GCC_DEFAULT "-march=native -fopenmp -std=c++11") #-march=core-avx2
   set(FLAGS_GCC_DEBUG   "-g -O0")
   set(FLAGS_GCC_RELEASE "-O3 -flto -fstrict-aliasing -finline-functions") # -ffast-math -fargument-noalias -fargument-noalias-global
 
