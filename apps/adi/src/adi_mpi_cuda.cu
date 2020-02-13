@@ -63,6 +63,7 @@
 extern char *optarg;
 extern int  optind, opterr, optopt;
 static struct option options[] = {
+  {"devid", required_argument, 0, 0   },
   {"nx",   required_argument, 0,  0   },
   {"ny",   required_argument, 0,  0   },
   {"nz",   required_argument, 0,  0   },
@@ -145,6 +146,7 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
   if( MPI_Init(&argc,&argv) != MPI_SUCCESS) { printf("MPI Couldn't initialize. Exiting"); exit(-1);}
 
   //int nx, ny, nz, iter, opt, prof;
+  int devid = 0;
   int nx_g = 256;
   int ny_g = 256;
   int nz_g = 256;
@@ -157,6 +159,7 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
   // Process arguments
   int opt_index = 0;
   while( getopt_long_only(argc, argv, "", options, &opt_index) != -1) {
+    if(strcmp((char*)options[opt_index].name,"devid") == 0) devid = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"nx"  ) == 0) nx_g = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"ny"  ) == 0) ny_g = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"nz"  ) == 0) nz_g = atoi(optarg);
@@ -165,6 +168,15 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
     if(strcmp((char*)options[opt_index].name,"prof") == 0) prof = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"help") == 0) print_help();
   }
+
+  cudaDeviceReset();
+  cudaSetDevice(devid);
+
+  #if FPPREC == 0
+    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+  #elif FPPREC == 1
+    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+  #endif
   
   int size[3] = {nx_g, ny_g, nz_g};
   
@@ -270,6 +282,9 @@ int main(int argc, char* argv[]) {
 //#define TIMED
 
   timing_start(&timer1);
+
+  FP *h_u = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
+  FP *du = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
   
   for(int it = 0; it < iter; it++) {
     
@@ -278,6 +293,12 @@ int main(int argc, char* argv[]) {
     preproc_mpi_cuda<FP>(pre_handle, trid_handle, mpi_handle);
     
     timing_end(&timer, &elapsed_preproc);
+
+    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+
+    rms("preproc h_u", h_u, trid_handle, mpi_handle);
+    rms("preproc du", du, trid_handle, mpi_handle);
 
     //
     // perform tri-diagonal solves in x-direction
@@ -288,6 +309,12 @@ int main(int argc, char* argv[]) {
     
     timing_end(&timer, &elapsed_trid_x);
 
+    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+
+    rms("x h_u", h_u, trid_handle, mpi_handle);
+    rms("x du", du, trid_handle, mpi_handle);
+
     //
     // perform tri-diagonal solves in y-direction
     //
@@ -297,6 +324,12 @@ int main(int argc, char* argv[]) {
     
     timing_end(&timer, &elapsed_trid_y);
     
+    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+
+    rms("y h_u", h_u, trid_handle, mpi_handle);
+    rms("y du", du, trid_handle, mpi_handle);
+
     //
     // perform tri-diagonal solves in z-direction
     //
@@ -309,18 +342,16 @@ int main(int argc, char* argv[]) {
   
   timing_end(&timer1, &elapsed_total);
   
-  FP *h_u = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
-  
-  FP *du = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
-  
   cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
-  
   cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
   
   rms("end h_u", h_u, trid_handle, mpi_handle);
   rms("end du", du, trid_handle, mpi_handle);
 
   MPI_Barrier(MPI_COMM_WORLD);
+
+  free(h_u);
+  free(du);
   
   double avg_total = 0.0;
 
@@ -515,6 +546,7 @@ int main(int argc, char* argv[]) {
   finalize(trid_handle, mpi_handle, pre_handle);
   
   MPI_Finalize();
+  cudaDeviceReset();
   return 0;
 
 }
