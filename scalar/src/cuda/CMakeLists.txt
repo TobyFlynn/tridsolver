@@ -37,6 +37,7 @@ if (BUILD_FOR_GPU)
             ARCHIVE DESTINATION ${CMAKE_BINARY_DIR}/lib)
 
 	  install(FILES ${PROJECT_SOURCE_DIR}/include/trid_mpi_cuda.hpp
+			${PROJECT_SOURCE_DIR}/include/trid_mpi.h
 		        DESTINATION ${CMAKE_BINARY_DIR}/include)
 		        
     cuda_add_library(tridcuda_mpi_pcr ${PROJECT_SOURCE_DIR}/src/cuda/trid_cuda_mpi_pcr.cu SHARED OPTIONS -Xcompiler -fPIC -Xcompiler ${OpenMP_CXX_FLAGS}) # Make binary relocatable

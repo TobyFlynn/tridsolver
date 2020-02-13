@@ -68,11 +68,11 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
   int ind = i + j*nx; 
 
   // Is the thread in active region?
-  int active = (i<nx) && (j<ny);
+  int active = (i < nx) && (j < ny);
   
   REAL ux_1, ux_2, uy_1, uy_2, uz_1, uz_2;
   
-  for(k=0; k<nz; k++) {
+  for(int k = 0; k < nz; k++) {
     if(active) {
       if( (start_g[0]==0 && i==0) || 
           (end_g[0]==size_g[0]-1 && i==size[0]-1) ||
@@ -101,25 +101,25 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
           if(j == 0) {
             uy_1 = rcv_y[1*nz*nx + k*nx + i];
           } else {
-            uy_1 = u[ind - padx];
+            uy_1 = u[ind - xpad];
           }
           
           if(j == ny - 1) {
             uy_2 = rcv_y[0*nz*nx + k*nx + i];
           } else {
-            uy_2 = u[ind + padx];
+            uy_2 = u[ind + xpad];
           }
           
           if(k == 0) {
             uz_1 = rcv_z[1*ny*nx + j*nx + i];
           } else {
-            uz_1 = u[ind - padx*pady];
+            uz_1 = u[ind - xpad*ny];
           }
           
           if(k == nz - 1) {
             uz_2 = rcv_z[0*ny*nx + j*nx + i];
           } else {
-            uz_2 = u[ind + padx*pady];
+            uz_2 = u[ind + xpad*ny];
           }
           
           du[ind] = lambda*( ux_1 + ux_2
@@ -161,7 +161,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
   int pady = trid_handle.pads[1];
   int padz = trid_handle.pads[2];
   
-  REAL *u = malloc(padx * pady * padz * sizeof(REAL));
+  REAL *u = (REAL *) malloc(padx * pady * padz * sizeof(REAL));
   cudaMemcpy(&u[0], &trid_handle.h_u[0], sizeof(FP) * padx * pady * padz, cudaMemcpyDeviceToHost);
   
   // Gather halo
@@ -350,11 +350,11 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
   
   //timing_end(app.prof, &timer, &app.elapsed_time[9], app.elapsed_name[9]);
   
-  cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * rcv_size_x, 
+  cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * pre_handle.rcv_size_x, 
              cudaMemcpyHostToDevice);
-  cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * rcv_size_y, 
+  cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * pre_handle.rcv_size_y, 
              cudaMemcpyHostToDevice);
-  cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * rcv_size_z, 
+  cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * pre_handle.rcv_size_z, 
              cudaMemcpyHostToDevice);
   
   dim3 dimGrid1(1+(nx-1)/32, 1+(ny-1)/4);

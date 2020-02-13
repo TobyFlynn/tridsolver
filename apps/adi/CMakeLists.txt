@@ -71,19 +71,23 @@ add_definitions(-DFPPREC=${FPPREC})
 #include_directories(${LIBTRID_PATH}/scalar/include ./include ../libtrid/ ../libtrid/src )
 
 if (BUILD_FOR_CPU)
-  add_executable(adi_cpu src/adi_cpu.cpp)
+  #add_executable(adi_cpu src/adi_cpu.cpp)
   #target_compile_options(adi_cpu PRIVATE -xAVX -parallel -openmp -no-offload)
-  target_include_directories(adi_cpu PRIVATE ${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
-  target_link_libraries(adi_cpu PRIVATE -L${LIBTRID_PATH}/lib -ltridcpu -L${INTEL_PATH}/compiler/lib/intel64 -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
+  #target_include_directories(adi_cpu PRIVATE ${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
+  #target_link_libraries(adi_cpu PRIVATE -L${LIBTRID_PATH}/lib -ltridcpu -L${INTEL_PATH}/compiler/lib/intel64 -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
 
   #/opt/intel/composer_xe_2015.3.187/bin/intel64/icc -O3 -xAVX -ip -restrict -parallel -fopenmp -openmp-report2 -qopt-report=2 -qopt-report-phase=vec -qopt-report=2 -qopt-report-phase=par  -DFPPREC=0  -DN_MAX=1024  -I./include -I./libtrid  -I./include -I./libtrid -I/opt/intel/composer_xe_2015.3.187/mkl/include   -D__LAPACKE__ src/adi_cpu.cpp -L/opt/intel/composer_xe_2015.3.187/mkl/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -L/opt/intel/composer_xe_2015.3.187/compiler/lib/intel64 -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts -o adi_mkl
-  add_executable(adi_mkl src/adi_cpu.cpp)
-  target_compile_definitions(adi_mkl PRIVATE -D__MKL__)
-  target_compile_options(adi_mkl PRIVATE -xAVX -parallel -openmp -no-offload)
-  target_include_directories(adi_mkl PRIVATE ${INTEL_PATH}/mkl/include ${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
-  target_link_libraries(adi_mkl -L${LIBTRID_PATH}/lib -ltridcpu -L${INTEL_PATH}/mkl/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -L${INTEL_PATH}/compiler/lib/intel64 -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
-
+  #add_executable(adi_mkl src/adi_cpu.cpp)
+  #target_compile_definitions(adi_mkl PRIVATE -D__MKL__)
+  #target_compile_options(adi_mkl PRIVATE -xAVX -parallel -openmp -no-offload)
+  #target_include_directories(adi_mkl PRIVATE ${INTEL_PATH}/mkl/include ${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
+  #target_link_libraries(adi_mkl -L${LIBTRID_PATH}/lib -ltridcpu -L${INTEL_PATH}/mkl/lib/intel64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -L${INTEL_PATH}/compiler/lib/intel64 -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
+  
   add_executable(adi_mpi_cpu src/adi_mpi_cpu.cpp)
+  find_package(MPI REQUIRED)
+  find_package(OpenMP REQUIRED)
+  target_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+  #add_executable(adi_mpi_cpu src/adi_mpi_cpu.cpp)
   target_compile_definitions(adi_mpi_cpu PRIVATE -D__MKL__)
   target_include_directories(adi_mpi_cpu PRIVATE ${INTEL_PATH}/mkl/include ${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include ${MPI_PATH}/include)
   target_link_libraries(adi_mpi_cpu PRIVATE -L${LIBTRID_PATH}/lib -ltridcpu -L${INTEL_PATH}/compiler/lib/intel64 -L${MPI_PATH}/lib -lmpi -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
@@ -131,6 +135,14 @@ if (BUILD_FOR_GPU)
   cuda_include_directories(${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
   cuda_add_executable(adi_cuda src/adi_cuda.cu src/preproc.cu)
   target_link_libraries(adi_cuda -L${LIBTRID_PATH}/lib -ltridcuda)
+
+  find_package(MPI REQUIRED)
+  find_package(OpenMP REQUIRED)
+  cuda_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+  cuda_add_executable(adi_mpi_cuda src/adi_mpi_cuda.cu)
+  #cuda_include_directories(${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include SYSTEM ${MPI_INCLUDE_PATH})
+  target_link_libraries(adi_mpi_cuda -L${LIBTRID_PATH}/lib -ltridcuda -ltridcuda_mpi_pcr ${MPI_C_LIBRARIES})# -L${MPI_INCLUDE_PATH}/lib -lmpi -limf -lintlc -lsvml -lirng -liomp5 -lcilkrts)
+
 endif (BUILD_FOR_GPU)
 
 

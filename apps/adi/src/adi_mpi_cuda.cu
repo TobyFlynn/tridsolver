@@ -54,6 +54,8 @@
   //#include "mkl.h"
 #endif
 
+#include "preproc_mpi_cuda.hpp"
+
 #define ROUND_DOWN(N,step) (((N)/(step))*step)
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
@@ -231,12 +233,12 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
 
 void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_handle<FP> &pre_handle) {
   tridMultiDimBatchPCRCleanMPI<FP>(trid_handle, mpi_handle);
-  _mm_free(pre_handle.halo_snd_x);
-  _mm_free(pre_handle.halo_rcv_x);
-  _mm_free(pre_handle.halo_snd_y);
-  _mm_free(pre_handle.halo_rcv_y);
-  _mm_free(pre_handle.halo_snd_z);
-  _mm_free(pre_handle.halo_rcv_z);
+  free(pre_handle.halo_snd_x);
+  free(pre_handle.halo_rcv_x);
+  free(pre_handle.halo_snd_y);
+  free(pre_handle.halo_rcv_y);
+  free(pre_handle.halo_snd_z);
+  free(pre_handle.halo_rcv_z);
   cudaFree(pre_handle.rcv_x);
   cudaFree(pre_handle.rcv_y);
   cudaFree(pre_handle.rcv_z);
@@ -246,7 +248,6 @@ int main(int argc, char* argv[]) {
   trid_mpi_handle mpi_handle;
   trid_handle<FP> trid_handle;
   preproc_handle<FP> pre_handle;
-  trid_timer trid_timing;
   int iter;
   const int INC = 1;
   init(trid_handle, mpi_handle, pre_handle, iter, argc, argv);
@@ -266,13 +267,6 @@ int main(int argc, char* argv[]) {
   
   double timers_avg[11];
 
-  for(int i = 0; i < 11; i++) {
-    trid_timing.elapsed_time_x[i] = 0.0;
-    trid_timing.elapsed_time_y[i] = 0.0;
-    trid_timing.elapsed_time_z[i] = 0.0;
-    timers_avg[i] = 0;
-  }
-  
 //#define TIMED
 
   timing_start(&timer1);
@@ -290,7 +284,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridMultiDimBatchPCRSolveMPI(trid_handle, mpi_handle, 0);
+    tridMultiDimBatchPCRSolveMPI<FP, 1>(trid_handle, mpi_handle, 0);
     
     timing_end(&timer, &elapsed_trid_x);
 
@@ -299,7 +293,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
 
-    tridMultiDimBatchPCRSolveMPI(trid_handle, mpi_handle, 1);
+    tridMultiDimBatchPCRSolveMPI<FP, 1>(trid_handle, mpi_handle, 1);
     
     timing_end(&timer, &elapsed_trid_y);
     
@@ -308,7 +302,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridMultiDimBatchPCRSolveMPI(trid_handle, mpi_handle, 2);
+    tridMultiDimBatchPCRSolveMPI<FP, 1>(trid_handle, mpi_handle, 2);
     
     timing_end(&timer, &elapsed_trid_z);
   }
