@@ -43,6 +43,7 @@
 #include "trid_mpi.h"
 #include "trid_cuda_mpi_pcr.h"
 #include "trid_common.h"
+#include "cutil_inline.h"
 
 #include "omp.h"
 //#include "offload.h"
@@ -169,8 +170,9 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
     if(strcmp((char*)options[opt_index].name,"help") == 0) print_help();
   }
 
-  cudaDeviceReset();
-  cudaSetDevice(devid);
+  cudaSafeCall( cudaDeviceReset() );
+  cutilDeviceInit(argc, argv);
+  cudaSafeCall( cudaSetDevice(devid) );
 
   #if FPPREC == 0
     cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
@@ -220,7 +222,7 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
     }
   }
   
-  cudaMemcpy(&trid_handle.h_u[0], &h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&trid_handle.h_u[0], &h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyHostToDevice) );
   
   free(h_u);
   
@@ -235,9 +237,9 @@ int init(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_hand
   pre_handle.halo_snd_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
   pre_handle.halo_rcv_z = (FP*) malloc(pre_handle.rcv_size_z * sizeof(FP));
   
-  cudaMalloc((void **)&pre_handle.rcv_x, pre_handle.rcv_size_x * sizeof(FP));
-  cudaMalloc((void **)&pre_handle.rcv_y, pre_handle.rcv_size_y * sizeof(FP));
-  cudaMalloc((void **)&pre_handle.rcv_z, pre_handle.rcv_size_z * sizeof(FP));
+  cudaSafeCall( cudaMalloc((void **)&pre_handle.rcv_x, pre_handle.rcv_size_x * sizeof(FP)) );
+  cudaSafeCall( cudaMalloc((void **)&pre_handle.rcv_y, pre_handle.rcv_size_y * sizeof(FP)) );
+  cudaSafeCall( cudaMalloc((void **)&pre_handle.rcv_z, pre_handle.rcv_size_z * sizeof(FP)) );
 
   return 0;
 
@@ -251,9 +253,9 @@ void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc
   free(pre_handle.halo_rcv_y);
   free(pre_handle.halo_snd_z);
   free(pre_handle.halo_rcv_z);
-  cudaFree(pre_handle.rcv_x);
-  cudaFree(pre_handle.rcv_y);
-  cudaFree(pre_handle.rcv_z);
+  cudaSafeCall( cudaFree(pre_handle.rcv_x) );
+  cudaSafeCall( cudaFree(pre_handle.rcv_y) );
+  cudaSafeCall( cudaFree(pre_handle.rcv_z) );
 }
 
 int main(int argc, char* argv[]) {
@@ -294,8 +296,8 @@ int main(int argc, char* argv[]) {
     
     timing_end(&timer, &elapsed_preproc);
 
-    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
-    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaSafeCall( cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
 
     rms("preproc h_u", h_u, trid_handle, mpi_handle);
     rms("preproc du", du, trid_handle, mpi_handle);
@@ -309,8 +311,8 @@ int main(int argc, char* argv[]) {
     
     timing_end(&timer, &elapsed_trid_x);
 
-    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
-    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaSafeCall( cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
 
     rms("x h_u", h_u, trid_handle, mpi_handle);
     rms("x du", du, trid_handle, mpi_handle);
@@ -324,8 +326,8 @@ int main(int argc, char* argv[]) {
     
     timing_end(&timer, &elapsed_trid_y);
     
-    cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
-    cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+    cudaSafeCall( cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
 
     rms("y h_u", h_u, trid_handle, mpi_handle);
     rms("y du", du, trid_handle, mpi_handle);
@@ -342,8 +344,8 @@ int main(int argc, char* argv[]) {
   
   timing_end(&timer1, &elapsed_total);
   
-  cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
-  cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
   
   rms("end h_u", h_u, trid_handle, mpi_handle);
   rms("end du", du, trid_handle, mpi_handle);

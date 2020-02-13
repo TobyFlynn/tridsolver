@@ -31,11 +31,12 @@
  */
 
 //#include"adi_simd.h"
-#include"trid_simd.h"
+//#include"trid_simd.h"
 
 //#include "adi_mpi.h"
 #include "mpi.h"
 #include "trid_mpi.h"
+#include "cutil_inline.h"
 
 template<typename REAL>
 struct preproc_handle {
@@ -162,7 +163,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
   int padz = trid_handle.pads[2];
   
   REAL *u = (REAL *) malloc(padx * pady * padz * sizeof(REAL));
-  cudaMemcpy(&u[0], &trid_handle.h_u[0], sizeof(FP) * padx * pady * padz, cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(&u[0], &trid_handle.h_u[0], sizeof(FP) * padx * pady * padz, cudaMemcpyDeviceToHost) );
   
   // Gather halo
   // X boundary
@@ -350,12 +351,12 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
   
   //timing_end(app.prof, &timer, &app.elapsed_time[9], app.elapsed_name[9]);
   
-  cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * pre_handle.rcv_size_x, 
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * pre_handle.rcv_size_y, 
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * pre_handle.rcv_size_z, 
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * pre_handle.rcv_size_x, 
+             cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * pre_handle.rcv_size_y, 
+             cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * pre_handle.rcv_size_z, 
+             cudaMemcpyHostToDevice) );
   
   dim3 dimGrid1(1+(nx-1)/32, 1+(ny-1)/4);
   dim3 dimBlock1(32,4);
@@ -364,6 +365,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
                   trid_handle.b, trid_handle.c, trid_handle.du, trid_handle.h_u, 
                   pre_handle.rcv_x, pre_handle.rcv_y, pre_handle.rcv_z, trid_handle.pads[0], 
                   trid_handle.start_g, trid_handle.end_g, trid_handle.size_g, trid_handle.size);
+  cudaCheckMsg("Preproc kernel execution failed\n");
   
   //timing_end(app.prof, &timer, &app.elapsed_time[10], app.elapsed_name[10]);
 }
