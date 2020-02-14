@@ -1,5 +1,6 @@
 #include "trid_mpi.h"
 #include "trid_strided_multidim_pcr_mpi.hpp"
+#include "cutil_inline.h"
 
 #include <cmath>
 
@@ -95,11 +96,11 @@ void tridMultiDimBatchPCRInitMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi
     mem_size *= handle.pads[i];
   }
   
-  cudaMalloc((void **)&handle.a, mem_size);
-  cudaMalloc((void **)&handle.b, mem_size);
-  cudaMalloc((void **)&handle.c, mem_size);
-  cudaMalloc((void **)&handle.du, mem_size);
-  cudaMalloc((void **)&handle.h_u, mem_size);
+  cudaSafeCall( cudaMalloc((void **)&handle.a, mem_size) );
+  cudaSafeCall( cudaMalloc((void **)&handle.b, mem_size) );
+  cudaSafeCall( cudaMalloc((void **)&handle.c, mem_size) );
+  cudaSafeCall( cudaMalloc((void **)&handle.du, mem_size) );
+  cudaSafeCall( cudaMalloc((void **)&handle.h_u, mem_size) );
   
   // Calculate reduced system sizes for each dimension
   handle.sys_len_l = (int *) calloc(handle.ndim, sizeof(int));
