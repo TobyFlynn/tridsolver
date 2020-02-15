@@ -30,10 +30,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//#include"adi_simd.h"
-//#include"trid_simd.h"
-
-//#include "adi_mpi.h"
 #include "mpi.h"
 #include "trid_mpi.h"
 #include "cutil_inline.h"
@@ -138,19 +134,12 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
 }
 
 template<typename REAL>
-//inline void preproc_mpi(REAL lambda, REAL* __restrict u, REAL* __restrict du, REAL* __restrict ax, REAL* __restrict bx, REAL* __restrict cx, REAL* __restrict ay, REAL* __restrict by, REAL* __restrict cy, REAL* __restrict az, REAL* __restrict bz, REAL* __restrict cz, int nx, int nx_pad, int ny, int nz, int ny_g, int nz_g, int nx_g, int x_start_g, int x_end_g) {
 inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL> &trid_handle, trid_mpi_handle &mpi_handle) {
   int   i, j, k, ind;
   double elapsed, timer = 0.0;
   //
   // calculate r.h.s. and set tri-diagonal coefficients
   //
-  //#ifndef VALID
-  //  #pragma omp parallel for collapse(2) private(i,ind,a,b,c,d)
-  //#endif
-
-  //  REAL *halo_sndbuf = (REAL*) _mm_malloc(2*app.ny*app.nz*sizeof(REAL),SIMD_WIDTH); // Send Buffer
-  //  REAL *halo_rcvbuf = (REAL*) _mm_malloc(2*app.ny*app.nz*sizeof(REAL),SIMD_WIDTH); // Receive Buffer
 
   //timing_start(app.prof, &timer);
   
@@ -365,7 +354,8 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, trid_handle<REAL>
                   trid_handle.b, trid_handle.c, trid_handle.du, trid_handle.h_u, 
                   pre_handle.rcv_x, pre_handle.rcv_y, pre_handle.rcv_z, trid_handle.pads[0], 
                   trid_handle.start_g, trid_handle.end_g, trid_handle.size_g, trid_handle.size);
-  cudaCheckMsg("Preproc kernel execution failed\n");
+  cudaSafeCall( cudaPeekAtLastError() );
+  cudaSafeCall( cudaDeviceSynchronize() );
   
   //timing_end(app.prof, &timer, &app.elapsed_time[10], app.elapsed_name[10]);
 }

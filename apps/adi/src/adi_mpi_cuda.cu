@@ -291,12 +291,20 @@ int main(int argc, char* argv[]) {
   for(int it = 0; it < iter; it++) {
     
     timing_start(&timer);
+
+    cudaSafeCall( cudaMemcpy(h_u, trid_handle.h_u, sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+
+    rms("start h_u", h_u, trid_handle, mpi_handle);
+    rms("start du", du, trid_handle, mpi_handle);
     
     preproc_mpi_cuda<FP>(pre_handle, trid_handle, mpi_handle);
     
     timing_end(&timer, &elapsed_preproc);
 
-    cudaSafeCall( cudaMemcpy(&h_u[0], &trid_handle.h_u[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaDeviceSynchronize() );
+
+    cudaSafeCall( cudaMemcpy(h_u, trid_handle.h_u, sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
     cudaSafeCall( cudaMemcpy(&du[0], &trid_handle.du[0], sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2], cudaMemcpyDeviceToHost) );
 
     rms("preproc h_u", h_u, trid_handle, mpi_handle);
