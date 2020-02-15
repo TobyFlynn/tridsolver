@@ -145,7 +145,9 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
                           const int nThreads, const int size_g, trid_mpi_handle &mpi_handle) {
   // TODO see if a way of getting this without MPI reduce
   int reducedSize_g;
-  if(solvedim == 1) {
+  if(solvedim == 0) {
+    MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.x_comm);
+  } else if(solvedim == 1) {
     MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.y_comm);
   } else if(solvedim == 2) {
     MPI_Allreduce(&reducedSize, &reducedSize_g, 1, MPI_INT, MPI_SUM, mpi_handle.z_comm);
