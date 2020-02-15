@@ -398,7 +398,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
   
   // Global start and end index of data needing to receive
   int rcv_start_g = this_proc_start_g - s;
-  int rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  int rcv_end_g = rcv_start_g + this_proc_reduced_size;
   
   // Only need to check procs that are 'below' the current MPI proc for "-s" elements
   for(int i = 0; i <  mpi_handle.coords[solvedim]; i++) {
@@ -472,7 +472,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
   
   // The start and end indices for the "+s" elements to recieve
   rcv_start_g = this_proc_start_g + s;
-  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  rcv_end_g = rcv_start_g + this_proc_reduced_size;
   
   // Only need to check procs that are 'above' the current MPI proc for "+s" elements
   for(int i = mpi_handle.coords[solvedim] + 1; i <  numProcs; i++) {
@@ -506,9 +506,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
   // Check if need to copy local memory to 'a_s', 'c_s' and 'd_s'
   // Check for -S elements
   rcv_start_g = this_proc_start_g - s;
-  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  rcv_end_g = rcv_start_g + this_proc_reduced_size;
   
-  if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
+  /*if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
       || (rcv_end_g <= this_proc_end_g && rcv_end_g >= this_proc_start_g)
       || (rcv_start_g < this_proc_start_g && rcv_end_g > this_proc_end_g)) {
     
@@ -525,13 +525,30 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
     cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
     cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+  }*/
+  
+  if((rcv_end_g <= this_proc_end_g && rcv_end_g >= this_proc_start_g)) {
+    
+    int snd_start_l = MAX(rcv_start_g - this_proc_start_g, 0);
+    
+    int rcv_start_l = MAX(snd_start_l - rcv_start_g, 0);
+    //int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
+    int count = this_proc_reduced_size - rcv_start_l;
+    
+    snd_start_l *= numTrids;
+    rcv_start_l *= numTrids;
+    count *= numTrids;
+  
+    cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
   }
   
   // Check for +S elements
   rcv_start_g = this_proc_start_g + s;
-  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  rcv_end_g = rcv_start_g + this_proc_reduced_size;
   
-  if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
+  /*if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)
       || (rcv_end_g <= this_proc_end_g && rcv_end_g >= this_proc_start_g)
       || (rcv_start_g < this_proc_start_g && rcv_end_g > this_proc_end_g)) {
     
@@ -549,12 +566,30 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
     cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
     cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+  }*/
+  
+  if((rcv_start_g <= this_proc_end_g && rcv_start_g >= this_proc_start_g)) {
+    
+    int snd_start_l = MAX(rcv_start_g - this_proc_start_g, 0);
+    
+    int rcv_start_l = MAX(this_proc_start_g - rcv_start_g, 0);
+    //int rcv_end_l = MIN(this_proc_end_g - rcv_start_g - 1, this_proc_reduced_size - 1);
+    int count = this_proc_reduced_size - snd_start_l;
+    
+    snd_start_l *= numTrids;
+    rcv_start_l += this_proc_reduced_size;
+    rcv_start_l *= numTrids;
+    count *= numTrids;
+  
+    cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
   }
   
   // Check if need to zero part of 'a_s', 'c_s' and 'd_s'
   // Check for -S elements
   rcv_start_g = this_proc_start_g - s;
-  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  rcv_end_g = rcv_start_g + this_proc_reduced_size;
   if(rcv_start_g < 0) {
     int count = MIN(abs(rcv_start_g), this_proc_reduced_size);
     int numThreads = count * numTrids;
@@ -582,7 +617,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
   
   // Check for +S elements
   rcv_start_g = this_proc_start_g + s;
-  rcv_end_g = rcv_start_g + numTrids * this_proc_reduced_size;
+  rcv_end_g = rcv_start_g + this_proc_reduced_size;
   
   int reduced_end = reducedStart_g[numProcs - 1] + reducedSizes[numProcs - 1] - 1;
   
