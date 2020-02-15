@@ -103,7 +103,7 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
             ux_1 = u[ind - 1];
           }
           
-          if(i == nx - 1) {
+          if(i == arg.nx - 1) {
             ux_2 = rcv_x[0*arg.nz*arg.ny + k*arg.ny + j];
           } else {
             ux_2 = u[ind + 1];
@@ -115,7 +115,7 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
             uy_1 = u[ind - arg.pad_x];
           }
           
-          if(j == ny - 1) {
+          if(j == arg.ny - 1) {
             uy_2 = rcv_y[0*arg.nz*arg.nx + k*arg.nx + i];
           } else {
             uy_2 = u[ind + arg.pad_x];
@@ -127,7 +127,7 @@ __global__ void preproc_mpi_cuda_kernel(REAL lambda, REAL *a, REAL *b, REAL *c, 
             uz_1 = u[ind - arg.pad_x*arg.ny];
           }
           
-          if(k == nz - 1) {
+          if(k == arg.nz - 1) {
             uz_2 = rcv_z[0*arg.ny*arg.nx + j*arg.nx + i];
           } else {
             uz_2 = u[ind + arg.pad_x*arg.ny];
