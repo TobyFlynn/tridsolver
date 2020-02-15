@@ -312,7 +312,7 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   
   cudaSafeCall( cudaMemcpy(&d_s[0], &rcvbuf[2 * numTrids], numTrids, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(&d_s[reducedSize * numTrids], &rcvbuf[3 * numTrids + 2 * numTrids], numTrids, 
-             cudaMemcpyHostToDevice)) 31;3
+             cudaMemcpyHostToDevice) );
 }
 
 
@@ -548,7 +548,7 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
   
     cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
     cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
-    cudaSafeCAll( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
   }
   
   // Check if need to zero part of 'a_s', 'c_s' and 'd_s'
