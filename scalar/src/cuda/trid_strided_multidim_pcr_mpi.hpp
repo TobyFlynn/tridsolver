@@ -5,6 +5,7 @@
 
 #include "trid_pcr_mpi_communication.hpp"
 #include "trid_pcr_mpi.hpp"
+#include "cutil_inline.h"
 
 // Function adapted from trid_thomaspcr_large.hpp
 template <typename REAL, int regStoreSize>
@@ -155,9 +156,9 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
   REAL *aa_r_s = NULL;
   REAL *cc_r_s = NULL;
   REAL *dd_r_s = NULL;
-  cudaMalloc((void **)&aa_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
-  cudaMalloc((void **)&cc_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
-  cudaMalloc((void **)&dd_r_s, sizeof(REAL) * reducedSize * numTrids * 2);
+  cudaSafeCall( cudaMalloc((void **)&aa_r_s, sizeof(REAL) * reducedSize * numTrids * 2) );
+  cudaSafeCall( cudaMalloc((void **)&cc_r_s, sizeof(REAL) * reducedSize * numTrids * 2) );
+  cudaSafeCall( cudaMalloc((void **)&dd_r_s, sizeof(REAL) * reducedSize * numTrids * 2) );
   
   // Needed for initial and final PCR stages as trid systems cannot be split across multiple blocks
   // in order to prevent race conditions
@@ -171,6 +172,9 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
   // Perform initial step of PCR
   batched_trid_reduced_init_kernel<REAL><<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, dd_r, 
                                   aa_r_s, cc_r_s, dd_r_s, numTrids, threadsPerTrid, reducedSize);
+  // Check for errors in kernel
+  cudaSafeCall( cudaPeekAtLastError() );
+  cudaSafeCall( cudaDeviceSynchronize() );
   
   for(int p = 1; p <= P; p++) {
     // s = 2^p
@@ -183,6 +187,9 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
     // Run PCR step on GPU
     batched_trid_reduced_kernel<REAL><<<nBlocks, nThreads>>>(aa_r, cc_r, dd_r, aa_r_s, cc_r_s, 
                                                   dd_r_s, numTrids, threadsPerTrid, reducedSize);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   }
   
   // Communicate boundary values for final step of PCR
@@ -191,11 +198,14 @@ void batched_trid_reduced(REAL* __restrict__ aa_r, REAL* __restrict__ cc_r,
   // Final part of PCR
   batched_trid_reduced_final_kernel<REAL><<<wholeTridBlocks, wholeTridThreads>>>(aa_r, cc_r, 
                                                       dd_r, dd_r_s, numTrids, threadsPerTrid);
+  // Check for errors in kernel
+  cudaSafeCall( cudaPeekAtLastError() );
+  cudaSafeCall( cudaDeviceSynchronize() );
   
   // Free memory
-  cudaFree(aa_r_s);
-  cudaFree(cc_r_s);
-  cudaFree(dd_r_s);
+  cudaSafeCall( cudaFree(aa_r_s) );
+  cudaSafeCall( cudaFree(cc_r_s) );
+  cudaSafeCall( cudaFree(dd_r_s) );
 }
 
 template<typename REAL, int regStoreSize>

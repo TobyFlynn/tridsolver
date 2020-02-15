@@ -4,6 +4,8 @@
 #include <cmath>
 #include <type_traits>
 
+#include "cutil_inline.h"
+
 #define ROUND_DOWN(N,step) (((N)/(step))*step)
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
@@ -24,11 +26,11 @@ void sendReducedMPI(int start, int count, int numTrids, int rank, const REAL* __
   int array_count = count * numTrids;
   
   // Copy necessary data to send buffer
-  cudaMemcpy(&sndbuf[0], &a[array_start], array_count * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[array_count], &c[array_start], array_count * sizeof(REAL), 
-             cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[2 * array_count], &d[array_start], array_count * sizeof(REAL), 
-             cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(&sndbuf[0], &a[array_start], array_count * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[array_count], &c[array_start], array_count * sizeof(REAL), 
+             cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[2 * array_count], &d[array_start], array_count * sizeof(REAL), 
+             cudaMemcpyDeviceToHost) );
   
   // Send data over MPI
   if(std::is_same<REAL, float>::value) {
@@ -54,11 +56,11 @@ void receiveReducedMPI(int start, int count, int numTrids, int rank, REAL* __res
   }
   
   // Copy data to GPU
-  cudaMemcpy(&a[array_start], &rcvbuf[0], array_count * sizeof(REAL), cudaMemcpyHostToDevice);
-  cudaMemcpy(&c[array_start], &rcvbuf[array_count], array_count * sizeof(REAL), 
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(&c[array_start], &rcvbuf[2 * array_count], array_count * sizeof(REAL), 
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&a[array_start], &rcvbuf[0], array_count * sizeof(REAL), cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&c[array_start], &rcvbuf[array_count], array_count * sizeof(REAL), 
+             cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&c[array_start], &rcvbuf[2 * array_count], array_count * sizeof(REAL), 
+             cudaMemcpyHostToDevice) );
 }
 
 template<typename REAL>
@@ -73,15 +75,15 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   REAL *sndbuf = (REAL *) malloc(3 * 2 * numTrids * sizeof(REAL));
   REAL *rcvbuf = (REAL *) calloc(3 * 2 * numTrids, sizeof(REAL));
   
-  cudaMemcpy(&sndbuf[0], &a[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[3 * numTrids], &a[numTrids * (threadsPerTrid * 2 - 1)], 
-             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[numTrids], &c[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[3 * numTrids + numTrids], &c[numTrids * (threadsPerTrid * 2 - 1)], 
-             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[2 * numTrids], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&sndbuf[3 * numTrids + 2 * numTrids], &d[numTrids * (threadsPerTrid * 2 - 1)], 
-             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(&sndbuf[0], &a[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[3 * numTrids], &a[numTrids * (threadsPerTrid * 2 - 1)], 
+             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[numTrids], &c[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[3 * numTrids + numTrids], &c[numTrids * (threadsPerTrid * 2 - 1)], 
+             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[2 * numTrids], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&sndbuf[3 * numTrids + 2 * numTrids], &d[numTrids * (threadsPerTrid * 2 - 1)], 
+             numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
   
   // Send | all 'a_0's | all 'c_0's | all 'd_0's |
   if(solvedim == 0) {
@@ -300,18 +302,19 @@ void getInitialValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__
   }
 
   // Transfer back to GPU
-  cudaMemcpy(&a_s[0], &rcvbuf[0], numTrids, cudaMemcpyHostToDevice);
-  cudaMemcpy(&a_s[reducedSize * numTrids], &rcvbuf[3 * numTrids], numTrids, 
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&a_s[0], &rcvbuf[0], numTrids, cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&a_s[reducedSize * numTrids], &rcvbuf[3 * numTrids], numTrids, 
+             cudaMemcpyHostToDevice) );
   
-  cudaMemcpy(&c_s[0], &rcvbuf[numTrids], numTrids, cudaMemcpyHostToDevice);
-  cudaMemcpy(&c_s[reducedSize * numTrids], &rcvbuf[3 * numTrids + numTrids], numTrids, 
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&c_s[0], &rcvbuf[numTrids], numTrids, cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&c_s[reducedSize * numTrids], &rcvbuf[3 * numTrids + numTrids], numTrids, 
+             cudaMemcpyHostToDevice) );
   
-  cudaMemcpy(&d_s[0], &rcvbuf[2 * numTrids], numTrids, cudaMemcpyHostToDevice);
-  cudaMemcpy(&d_s[reducedSize * numTrids], &rcvbuf[3 * numTrids + 2 * numTrids], numTrids, 
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&d_s[0], &rcvbuf[2 * numTrids], numTrids, cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(&d_s[reducedSize * numTrids], &rcvbuf[3 * numTrids + 2 * numTrids], numTrids, 
+             cudaMemcpyHostToDevice)) 31;3
 }
+
 
 template<typename REAL, int regStoreSize>
 void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c, 
@@ -519,9 +522,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     rcv_start_l *= numTrids;
     count *= numTrids;
   
-    cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
   }
   
   // Check for +S elements
@@ -543,9 +546,9 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
     rcv_start_l *= numTrids;
     count *= numTrids;
   
-    cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice);
+    cudaSafeCall( cudaMemcpy(&a_s[rcv_start_l], &a[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCall( cudaMemcpy(&c_s[rcv_start_l], &c[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
+    cudaSafeCAll( cudaMemcpy(&d_s[rcv_start_l], &d[snd_start_l], count * sizeof(REAL), cudaMemcpyDeviceToDevice) );
   }
   
   // Check if need to zero part of 'a_s', 'c_s' and 'd_s'
@@ -564,8 +567,17 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       nBlocks = (int)ceil((double)numThreads / (double)nThreads);
     }
     zeroArray<REAL><<<nBlocks,nThreads>>>(0, count * numTrids, a_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     zeroArray<REAL><<<nBlocks,nThreads>>>(0, count * numTrids, c_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     zeroArray<REAL><<<nBlocks,nThreads>>>(0, count * numTrids, d_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   }
   
   // Check for +S elements
@@ -588,8 +600,17 @@ void getValuesForPCR(const REAL* __restrict__ a, const REAL* __restrict__ c,
       nBlocks = (int)ceil((double)numThreads / (double)nThreads);
     }
     zeroArray<REAL><<<nBlocks,nThreads>>>(start, count * numTrids, a_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     zeroArray<REAL><<<nBlocks,nThreads>>>(start, count * numTrids, c_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     zeroArray<REAL><<<nBlocks,nThreads>>>(start, count * numTrids, d_s);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   }
   
   // Free buffers
@@ -604,7 +625,7 @@ void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
   REAL *sndbuf = (REAL *) malloc(numTrids * sizeof(REAL));
   REAL *rcvbuf = (REAL *) calloc(numTrids, sizeof(REAL));
   
-  cudaMemcpy(&sndbuf[0], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(&sndbuf[0], &d[0], numTrids * sizeof(REAL), cudaMemcpyDeviceToHost) );
   
   // Send
   if(solvedim == 0) {
@@ -715,7 +736,7 @@ void getFinalValuesForPCR(const REAL* __restrict__ d, REAL* __restrict__ d_s,
   }
   
   // Copy to GPU
-  cudaMemcpy(&d_s[0], &rcvbuf[0], numTrids * sizeof(REAL), cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(&d_s[0], &rcvbuf[0], numTrids * sizeof(REAL), cudaMemcpyHostToDevice) );
 }
 
 #endif

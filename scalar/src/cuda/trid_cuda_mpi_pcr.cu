@@ -132,11 +132,11 @@ void tridMultiDimBatchPCRCleanMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   free(handle.sys_len_l);
   free(handle.n_sys_g);
   free(handle.n_sys_l);
-  cudaFree(handle.a);
-  cudaFree(handle.b);
-  cudaFree(handle.c);
-  cudaFree(handle.du);
-  cudaFree(handle.h_u);
+  cudaSafeCall( cudaFree(handle.a) );
+  cudaSafeCall( cudaFree(handle.b) );
+  cudaSafeCall( cudaFree(handle.c) );
+  cudaSafeCall( cudaFree(handle.du) );
+  cudaSafeCall( cudaFree(handle.h_u) );
 }
 
 template<typename REAL, int INC>
@@ -148,9 +148,9 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   REAL *aa = NULL;
   REAL *cc = NULL;
   REAL *dd = NULL;
-  cudaMalloc((void **)&aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
-  cudaMalloc((void **)&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
-  cudaMalloc((void **)&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+  cudaSafeCall( cudaMalloc((void **)&aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]) );
+  cudaSafeCall( cudaMalloc((void **)&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]) );
+  cudaSafeCall( cudaMalloc((void **)&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]) );
   
   // TODO Copy memory from Host to GPU
   
@@ -179,14 +179,17 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaSafeCall( cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids) );
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
                                 numTrids, batchSize, batchStride, threadsPerTrid);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -198,16 +201,22 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
       batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     } else {
       batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     }
     
     // Free memory
-    cudaFree(aa_r);
-    cudaFree(cc_r);
-    cudaFree(dd_r);
+    cudaSafeCall( cudaFree(aa_r) );
+    cudaSafeCall( cudaFree(cc_r) );
+    cudaSafeCall( cudaFree(dd_r) );
   } else if(solvedim == 1) {
     // Call forwards pass
     const int numTrids = handle.size[0] * handle.size[2];
@@ -233,14 +242,17 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaSafeCall( cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids) );
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
                                 numTrids, batchSize, batchStride, threadsPerTrid);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -252,16 +264,22 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
       batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     } else {
       batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     }
     
     // Free memory
-    cudaFree(aa_r);
-    cudaFree(cc_r);
-    cudaFree(dd_r);
+    cudaSafeCall( cudaFree(aa_r) );
+    cudaSafeCall( cudaFree(cc_r) );
+    cudaSafeCall( cudaFree(dd_r) );
   } else if(solvedim == 2) {
     // Call forwards pass
     const int numTrids = handle.size[0] * handle.size[1];
@@ -287,14 +305,17 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     REAL *aa_r = NULL;
     REAL *cc_r = NULL;
     REAL *dd_r = NULL;
-    cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids);
-    cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids);
+    cudaSafeCall( cudaMalloc((void **)&aa_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&cc_r, sizeof(REAL) * reducedSize * numTrids) );
+    cudaSafeCall( cudaMalloc((void **)&dd_r, sizeof(REAL) * reducedSize * numTrids) );
     
     // Call forwards pass
     batched_trid_forwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(handle.a, handle.b, handle.c, 
                                 handle.du, aa, cc, dd, aa_r, cc_r, dd_r, length, stride, 
                                 numTrids, batchSize, batchStride, threadsPerTrid);
+    // Check for errors in kernel
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
@@ -306,16 +327,22 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
       batched_trid_backwardsInc_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.h_u, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     } else {
       batched_trid_backwards_kernel<REAL, regStoreSize><<<nBlocks, nThreads>>>(aa, cc, dd, dd_r, handle.du, 
                                                       length, stride, numTrids, batchSize, 
                                                       batchStride, threadsPerTrid);
+      // Check for errors in kernel
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     }
     
     // Free memory
-    cudaFree(aa_r);
-    cudaFree(cc_r);
-    cudaFree(dd_r);
+    cudaSafeCall( cudaFree(aa_r) );
+    cudaSafeCall( cudaFree(cc_r) );
+    cudaSafeCall( cudaFree(dd_r) );
   }
 }
 
