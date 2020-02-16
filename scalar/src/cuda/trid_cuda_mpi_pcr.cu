@@ -23,6 +23,29 @@ void setStartEnd(int *start, int *end, int coord, int numProcs, int numElements)
   }
 }
 
+void rms(char* name, FP* array, trid_handle<FP> &handle, trid_mpi_handle &mpi_handle) {
+  //Sum the square of values in app.h_u
+  double sum = 0.0;
+  for(int k = 0; k < handle.size[2]; k++) {
+    for(int j = 0; j < handle.size[1]; j++) {
+      for(int i = 0; i < handle.size[0]; i++) {
+        int ind = k * handle.pads[0] * handle.pads[1] + j * handle.pads[0] + i;
+        //sum += array[ind]*array[ind];
+        sum += array[ind];
+      }
+    }
+  }
+
+  double global_sum = 0.0;
+  MPI_Allreduce(&sum, &global_sum,1, MPI_DOUBLE,MPI_SUM, mpi_handle.comm);
+
+  if(mpi_handle.rank ==0) {
+    printf("%s sum = %lg\n", name, global_sum);
+    //printf("%s rms = %2.15lg\n",name, sqrt(global_sum)/((double)(app.nx_g*app.ny_g*app.nz_g)));
+  }
+
+}
+
 template<typename REAL>
 void tridMultiDimBatchPCRInitMPI(trid_handle<REAL> &handle, trid_mpi_handle &mpi_handle, 
                                  int ndim, int *size) {
@@ -152,8 +175,6 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
   cudaSafeCall( cudaMalloc((void **)&cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]) );
   cudaSafeCall( cudaMalloc((void **)&dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]) );
   
-  // TODO Copy memory from Host to GPU
-  
   if(solvedim == 0) {
     // Call forwards pass
     const int numTrids = handle.size[1] * handle.size[2];
@@ -190,6 +211,22 @@ void tridMultiDimBatchPCRSolveMPI(trid_handle<REAL> &handle, trid_mpi_handle &mp
     // Check for errors in kernel
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
+    
+    REAL *h_aa = (REAL *) malloc(sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+    REAL *h_cc = (REAL *) malloc(sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+    REAL *h_dd = (REAL *) malloc(sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2]);
+    
+    cudaSafeCall( cudaMemcpy(h_aa, aa, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(h_cc, cc, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2], cudaMemcpyDeviceToHost) );
+    cudaSafeCall( cudaMemcpy(h_dd, dd, sizeof(REAL) * handle.pads[0] * handle.size[1] * handle.size[2], cudaMemcpyDeviceToHost) );
+    
+    rms("aa", h_aa, handle, mpi_handle);
+    rms("cc", h_cc, handle, mpi_handle);
+    rms("dd", h_dd, handle, mpi_handle);
+    
+    free(h_aa);
+    free(h_cc);
+    free(h_dd);
     
     // Call PCR reduced (modified to include MPI comm as reduced system will 
     // be spread over nodes)
