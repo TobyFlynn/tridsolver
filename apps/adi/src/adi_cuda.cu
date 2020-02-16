@@ -85,6 +85,22 @@ inline void timing_end(int prof, double *timer, double *elapsed_accumulate, std:
   }
 }
 
+void rms(char* name, FP* array, int nx, int ny, int nz, int padx) {
+  //Sum the square of values in app.h_u
+  double sum = 0.0;
+  for(int k = 0; k < nz; k++) {
+    for(int j = 0; j < ny; j++) {
+      for(int i = 0; i < nx; i++) {
+        int ind = k * padx * ny + j * padx + i;
+        //sum += array[ind]*array[ind];
+        sum += array[ind];
+      }
+    }
+  }
+
+  printf("%s sum = %lg\n", name, sum);
+}
+
 int main(int argc, char* argv[]) {
   double timer, timer2, elapsed, elapsed_total, elapsed_preproc, elapsed_trid_x, elapsed_trid_y, elapsed_trid_z;
   int    i, j, k, ind, it;
@@ -274,15 +290,21 @@ int main(int argc, char* argv[]) {
       cudaCheckMsg("preproc execution failed\n");
     timing_end(prof,&timer,&elapsed_preproc,"preproc");
 
+    cudaSafeCall(cudaMemcpy(h_u, d_u, sizeof(FP)*nx*ny*nz, cudaMemcpyDeviceToHost) );
+    rms("preproc h_u", h_u, nx, ny, nz, dims[0]);
+
     timing_start(prof,&timer);
       solvedim = 0;
       //tridMultiDimBatchSolve<FP,0>(d_ax, d_bx, d_cx, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #if FPPREC==0
-        tridSmtsvStridedBatch(d_ax, d_bx, d_cx, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
+        tridSmtsvStridedBatchInc(d_ax, d_bx, d_cx, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #elif FPPREC==1
-        tridDmtsvStridedBatch(d_ax, d_bx, d_cx, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
+        tridDmtsvStridedBatchInc(d_ax, d_bx, d_cx, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #endif
     timing_end(prof,&timer,&elapsed_trid_x,"trid_x");
+
+    cudaSafeCall(cudaMemcpy(h_u, d_u, sizeof(FP)*nx*ny*nz, cudaMemcpyDeviceToHost) );
+    rms("x h_u", h_u, nx, ny, nz, dims[0]);
 
     timing_start(prof,&timer);
       solvedim = 1;
@@ -290,11 +312,14 @@ int main(int argc, char* argv[]) {
       //else           tridMultiDimBatchSolve<FP,0>(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, &d_buffer, sync);
       //tridMultiDimBatchSolve<FP,0>(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #if FPPREC==0
-        tridSmtsvStridedBatch(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
+        tridSmtsvStridedBatchInc(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #elif FPPREC==1
-        tridDmtsvStridedBatch(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
+        tridDmtsvStridedBatchInc(d_ay, d_by, d_cy, d_du, d_u, ndim, solvedim, dims, pads, opts, sync);
       #endif
     timing_end(prof,&timer,&elapsed_trid_y,"trid_y");
+
+    cudaSafeCall(cudaMemcpy(h_u, d_u, sizeof(FP)*nx*ny*nz, cudaMemcpyDeviceToHost) );
+    rms("y h_u", h_u, nx, ny, nz, dims[0]);
 
     timing_start(prof,&timer);
       solvedim = 2;
@@ -324,7 +349,10 @@ int main(int argc, char* argv[]) {
   printf("\nCopy u to host: %f (s) \n", elapsed);
 
   int ldim=nx;
-  #include "print_array.c"
+
+  rms("end h_u", h_u, nx, ny, nz, dims[0]);
+
+  //#include "print_array.c"
 
   // Release GPU and CPU memory
   cudaSafeCall(cudaFree(d_u) );
