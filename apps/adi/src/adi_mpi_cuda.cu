@@ -128,7 +128,7 @@ void rms(char* name, FP* array, app_handle &handle) {
   for(int k = 0; k < handle.size[2]; k++) {
     for(int j = 0; j < handle.size[1]; j++) {
       for(int i = 0; i < handle.size[0]; i++) {
-        int ind = k * handle.pads[0] * handle.pads[1] + j * handle.pads[0] + i;
+        int ind = k * handle.size[0] * handle.size[1] + j * handle.size[0] + i;
         //sum += array[ind]*array[ind];
         sum += array[ind];
       }
@@ -138,7 +138,7 @@ void rms(char* name, FP* array, app_handle &handle) {
   double global_sum = 0.0;
   MPI_Allreduce(&sum, &global_sum,1, MPI_DOUBLE,MPI_SUM, handle.comm);
 
-  if(mpi_handle.rank ==0) {
+  if(handle.coords[0] == 0 && handle.coords[1] == 0 && handle.coords[2] == 0) {
     printf("%s sum = %lg\n", name, global_sum);
     //printf("%s rms = %2.15lg\n",name, sqrt(global_sum)/((double)(app.nx_g*app.ny_g*app.nz_g)));
   }
@@ -217,20 +217,20 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   app.pdims    = (int *) calloc(3, sizeof(int));
   int *periodic = (int *) calloc(3, sizeof(int)); //false
   app.coords   = (int *) calloc(3, sizeof(int));
-  MPI_Dims_create(procs, 3, pdims);
+  MPI_Dims_create(procs, 3, app.pdims);
   
   // Create cartecian mpi comm
-  MPI_Cart_create(MPI_COMM_WORLD, 3, pdims, periodic, 0,  &app.comm);
+  MPI_Cart_create(MPI_COMM_WORLD, 3, app.pdims, periodic, 0,  &app.comm);
   
   int my_cart_rank;
   
   MPI_Comm_rank(app.comm, &my_cart_rank);
-  MPI_Cart_coords(app.comm, my_cart_rank, 3, coords);
+  MPI_Cart_coords(app.comm, my_cart_rank, 3, app.coords);
 
-  app.params = MpiSolverParams(app.comm, 3, pdims);
+  app.params = new MpiSolverParams(app.comm, 3, app.pdims);
   
   for(int i = 0; i < 3; i++) {
-    setStartEnd(&app.start_g[i], &app.end_g[i], coords[i], pdims[i], app.size_g[i])
+    setStartEnd(&app.start_g[i], &app.end_g[i], app.coords[i], app.pdims[i], app.size_g[i]);
     app.size[i] = app.end_g[i] - app.start_g[i] + 1;
   }
   
@@ -253,7 +253,7 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   printf("Check parameters: nz = %d, z_start_g = %d, z_end_g = %d \n",
          trid_handle.size[2], trid_handle.start_g[2], trid_handle.end_g[2]);*/
   
-  int size = app.dims[0] * app.dims[1] * app.dims[2];
+  int size = app.size[0] * app.size[1] * app.size[2];
   
   cudaSafeCall( cudaMalloc((void **)&app.a, size * sizeof(FP)) );
   cudaSafeCall( cudaMalloc((void **)&app.b, size * sizeof(FP)) );
@@ -305,7 +305,7 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
 
 }
 
-void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc_handle<FP> &pre_handle) {
+void finalize(app_handle &app, preproc_handle<FP> &pre_handle) {
   free(pre_handle.halo_snd_x);
   free(pre_handle.halo_rcv_x);
   free(pre_handle.halo_snd_y);
@@ -322,12 +322,14 @@ void finalize(trid_handle<FP> &trid_handle, trid_mpi_handle &mpi_handle, preproc
   cudaSafeCall( cudaFree(app.d) );
   cudaSafeCall( cudaFree(app.u) );
   
-  free(size_g);
-  free(size);
-  free(start_g);
-  free(end_g);
-  free(pdims);
-  free(coords);
+  free(app.size_g);
+  free(app.size);
+  free(app.start_g);
+  free(app.end_g);
+  free(app.pdims);
+  free(app.coords);
+
+  delete app.params;
 }
 
 int main(int argc, char* argv[]) {
@@ -357,8 +359,8 @@ int main(int argc, char* argv[]) {
 
   timing_start(&timer1);
 
-  FP *h_u = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
-  FP *du = (FP *) malloc(sizeof(FP) * trid_handle.pads[0] * trid_handle.pads[1] * trid_handle.pads[2]);
+  FP *h_u = (FP *) malloc(sizeof(FP) * app.size[0] * app.size[1] * app.size[2]);
+  FP *du = (FP *) malloc(sizeof(FP) * app.size[0] * app.size[1] * app.size[2]);
   
   for(int it = 0; it < iter; it++) {
     
@@ -387,7 +389,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridDmtsvStridedBatchIncMPI(app.params, app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size);
     
     timing_end(&timer, &elapsed_trid_x);
 
@@ -402,7 +404,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
 
-    tridDmtsvStridedBatchIncMPI(app.params, app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size);
     
     timing_end(&timer, &elapsed_trid_y);
     
@@ -417,7 +419,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridDmtsvStridedBatchIncMPI(app.params, app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size);
     
     timing_end(&timer, &elapsed_trid_z);
   }
@@ -606,7 +608,7 @@ int main(int argc, char* argv[]) {
   }*/
   
   MPI_Barrier(MPI_COMM_WORLD);
-  if(mpi_handle.rank == 0) {
+  if(app.coords[0] == 0 && app.coords[1] == 0 && app.coords[2] == 0) {
     // Print execution times
     printf("Time per section: \n[total] \t[prepro] \t[trid_x] \t[trid_y] \t[trid_z]\n");
     printf("%e \t%e \t%e \t%e \t%e\n",

@@ -20,7 +20,7 @@ struct app_handle {
   int *coords;
   
   MPI_Comm comm;
-  MpiSolverParams params;
+  MpiSolverParams *params;
 };
 
 #endif

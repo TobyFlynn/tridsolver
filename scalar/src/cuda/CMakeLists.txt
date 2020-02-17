@@ -7,7 +7,7 @@ if (BUILD_FOR_GPU)
 	set(CUDA_64_BIT_DEVICE_CODE ON) # -m64 compiler option
 	set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-	set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS}         -arch=sm_35 -gencode arch=compute_60,code=sm_60 -Xptxas -dlcm=cg")
+	set(CUDA_NVCC_FLAGS         "${CUDA_NVCC_FLAGS}         -arch=sm_35 -gencode arch=compute_60,code=sm_60 -Xptxas -dlcm=cg -std=c++11")
 	set(CUDA_NVCC_FLAGS_DEBUG   "${CUDA_NVCC_FLAGS_DEBUG}   -g -G -O0 -ftz=false -fmad=false               ")
 	set(CUDA_NVCC_FLAGS_RELEASE "${CUDA_NVCC_FLAGS_RELEASE} -O3                                            ")
 
@@ -36,7 +36,8 @@ if (BUILD_FOR_GPU)
             LIBRARY DESTINATION ${CMAKE_BINARY_DIR}/lib
             ARCHIVE DESTINATION ${CMAKE_BINARY_DIR}/lib)
 
-	  install(FILES ${PROJECT_SOURCE_DIR}/include/trid_mpi_cuda.h
+	  install(FILES ${PROJECT_SOURCE_DIR}/include/trid_mpi_cuda.hpp
+                        ${PROJECT_SOURCE_DIR}/include/trid_mpi_solver_params.hpp
 		        DESTINATION ${CMAKE_BINARY_DIR}/include)
 
   endif (BUILD_FOR_MPI)

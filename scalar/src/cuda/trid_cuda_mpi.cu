@@ -41,6 +41,7 @@
 #include <cassert>
 #include <functional>
 #include <numeric>
+#include <type_traits>
 
 //
 // Thomas solver for reduced systems

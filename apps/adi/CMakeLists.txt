@@ -123,7 +123,7 @@ if (BUILD_FOR_GPU)
   #find_package(CUDA)
 
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-  set(CUDA_NVCC_FLAGS         "-arch sm_35 --ptxas-options=-v -Xptxas -dlcm=cg")
+  set(CUDA_NVCC_FLAGS         "-arch sm_35 --ptxas-options=-v -Xptxas -dlcm=cg -std=c++11")
   set(CUDA_NVCC_FLAGS_DEBUG   "-g -G -O0 -ftz=false -fmad=false")
   set(CUDA_NVCC_FLAGS_RELEASE "-O3")
 
@@ -131,6 +131,13 @@ if (BUILD_FOR_GPU)
   cuda_include_directories(${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include)
   cuda_add_executable(adi_cuda src/adi_cuda.cu src/preproc.cu)
   target_link_libraries(adi_cuda -L${LIBTRID_PATH}/lib -ltridcuda)
+
+  find_package(MPI REQUIRED)
+  find_package(OpenMP REQUIRED)
+  cuda_include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+  cuda_add_executable(adi_mpi_cuda src/adi_mpi_cuda.cu)
+  #cuda_include_directories(${LIBTRID_PATH}/include ${PROJECT_SOURCE_DIR}/include SYSTEM ${MPI_INCLUDE_PATH})
+  target_link_libraries(adi_mpi_cuda -L${LIBTRID_PATH}/lib -ltridcuda -ltridcuda_mpi ${MPI_C_LIBRARIES})
 endif (BUILD_FOR_GPU)
 
 
