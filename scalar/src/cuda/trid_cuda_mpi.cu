@@ -55,30 +55,43 @@
 template <typename REAL>
 void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord) {
-#pragma omp parallel for
+  std::vector<REAL> h_aa_r(2 * num_proc * sys_n), h_cc_r(2 * num_proc * sys_n), 
+                    h_dd_r(2 * num_proc * sys_n);
+  
+  REAL *aa_r, *cc_r, *dd_r;
+  cudaMalloc(&aa_r, 2 * num_proc * sys_n * sizeof(REAL));
+  cudaMalloc(&cc_r, 2 * num_proc * sys_n * sizeof(REAL));
+  cudaMalloc(&dd_r, 2 * num_proc * sys_n * sizeof(REAL));
+                    
+  #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
-    // Reduced system
-    std::vector<REAL> aa_r(2 * num_proc), cc_r(2 * num_proc),
-        dd_r(2 * num_proc);
     // The offset in the send and receive buffers
-    const size_t comm_buf_offset = eq_idx * 6;
-    const size_t comm_buf_size = 6 * sys_n;
+    const size_t buf_offset = eq_idx * 6;
+    const size_t buf_size = 6 * sys_n;
     for (int i = 0; i < num_proc; ++i) {
-      aa_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 0];
-      aa_r[2 * i + 1] = receive_buf[comm_buf_size * i + comm_buf_offset + 1];
-      cc_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 2];
-      cc_r[2 * i + 1] = receive_buf[comm_buf_size * i + comm_buf_offset + 3];
-      dd_r[2 * i + 0] = receive_buf[comm_buf_size * i + comm_buf_offset + 4];
-      dd_r[2 * i + 1] = receive_buf[comm_buf_size * i + comm_buf_offset + 5];
+      h_aa_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 0];
+      h_aa_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 1];
+      h_cc_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 2];
+      h_cc_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 3];
+      h_dd_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 4];
+      h_dd_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 5];
     }
-
-    // indexing of cc_r, dd_r starts from 0
-    // while indexing of aa_r starts from 1
-    thomas_on_reduced<REAL>(aa_r.data(), cc_r.data(), dd_r.data(), 2 * num_proc,
-                            1);
-
-    results[2 * eq_idx + 0] = dd_r[2 * mpi_coord + 0];
-    results[2 * eq_idx + 1] = dd_r[2 * mpi_coord + 1];
+  }
+  
+  cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
+  cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
+  cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
+  
+  // TODO call PCR
+  
+  
+  // TODO change to kernel that places straight in boundaries array
+  cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyDeviceToHost);
+  
+  #pragma omp parallel for
+  for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
+    results[2 * eq_idx + 0] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 0)];
+    results[2 * eq_idx + 1] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 1)];
   }
 }
 
