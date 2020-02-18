@@ -165,91 +165,6 @@ __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, co
 }
 
 template<typename REAL>
-__global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const int P) {
-  int tridNum = blockIdx.x;
-  int i = threadIdx.x * 2 + 1;
-  int ind = tridNum * n + i;
-
-  if(i >= n) {
-    __syncthreads();
-    __syncthreads();
-
-    for(int p = 1; p <= P; p++) {
-      __syncthreads();
-    }
-    
-    __syncthreads();
-    return;
-  }
-
-  REAL a_m, a_i, a_p;
-  REAL c_m, c_i, c_p;
-  REAL d_m, d_i, d_p;
-  
-  a_i = a[ind];
-  c_i = c[ind];
-  d_i = d[ind];
-
-  a_m = a[ind - 1];
-  c_m = a[ind - 1];
-  d_m = a[ind - 1];
-
-  if(i + 1 >= n) { 
-    a_p = (REAL) 0.0;
-    c_p = (REAL) 0.0;
-    d_p = (REAL) 0.0;
-  } else {
-    a_p = a[ind + 1];
-    c_p = c[ind + 1];
-    d_p = d[ind + 1];
-  }
-  
-  // Potentially not needed for first step? 
-  // But might improve performance if cache has to be updated?
-  __syncthreads();
-  
-  REAL r = 1.0 - a_i * c_m - c_i * a_p;
-  r = 1.0 / r;
-  d[ind] = r * (d_i - a_i * d_m - c_i * d_p);
-  a[ind] = -r * a_i * a_m;
-  c[ind] = -r * c_i * c_p;
-  
-  __syncthreads();
-  
-  int s = 1;
-  for(int p = 1; p <= P; p++) {
-    
-    s = s << 1;
-
-    pcr_step<REAL>(a, c, d, n, s);
-    
-    __syncthreads();
-  }
-
-  REAL d_m2;
-
-  if(i - 2 < 0) {
-    d_m2 = (REAL) 0.0;
-  } else {
-    d_m2 = d[ind - 2];
-  }
-  
-  d_m = d[ind - 1];
-  d_i = d[ind];
-
-  if(i + 1 >= n) {
-    d_p = (REAL) 0.0;
-  } else {
-    d_p = d[ind + 1];
-  }
-   
-  __syncthreads();
-  
-  d[ind - 1] = d[ind - 1] - a[ind - 1] * d_m2 - c[ind - 1] * d_i;
-  d[ind] = d[ind] - a[ind] * d_m - c[ind] * d_p;
-}
-
-template<typename REAL>
 __global__ void pure_pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const int P) {
   int tridNum = blockIdx.x;
   int i = threadIdx.x;
@@ -296,7 +211,7 @@ __global__ void pure_pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int 
     r = 1.0 / r;
     d[ind] = r * (d[ind] - a[ind] * d_m - c[ind] * d_p);
     a[ind] = -r * a[ind] * a_m;
-    c[ind] = -r * c[ind] * c_p
+    c[ind] = -r * c[ind] * c_p;
     
     __syncthreads();
     
