@@ -60,7 +60,8 @@
 template <typename REAL>
 void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord) {
-  const int reducedSize = 2 * num_proc * sys_n;
+  const int reducedSysLen = 2 * num_proc;
+  const int reducedSize = reducedSysLen * sys_n;
   
   std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
   
@@ -89,8 +90,11 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   
   // Call PCR
-  int P = (int) ceil(log2((REAL)reducedSize));
-  pcr_on_reduced_kernel<REAL><<<sys_n,reducedSize / 2>>>(aa_r, cc_r, dd_r, reducedSize, P);
+  int P = (int) ceil(log2((REAL)reducedSysLen));
+  int numBlocks = sys_n;
+  int numThreads =  reducedSysLen / 2;
+  printf("Blocks %d, Threads %d, P %d, 2^P %d, N %d\n", numBlocks, numThreads, P, 1 << P, reducedSysLen);
+  pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
   
   cudaSafeCall( cudaPeekAtLastError() );
   cudaSafeCall( cudaDeviceSynchronize() );
@@ -106,7 +110,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   
   cudaSafeCall( cudaFree(aa_r) );
   cudaSafeCall( cudaFree(cc_r) );
-  cudaSafeCall( cudaFree(dd_r);
+  cudaSafeCall( cudaFree(dd_r) );
 }
 
 template <typename REAL, int INC>

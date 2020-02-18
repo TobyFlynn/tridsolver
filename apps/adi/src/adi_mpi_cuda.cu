@@ -139,7 +139,7 @@ void rms(char* name, FP* array, app_handle &handle) {
   MPI_Allreduce(&sum, &global_sum,1, MPI_DOUBLE,MPI_SUM, handle.comm);
 
   if(handle.coords[0] == 0 && handle.coords[1] == 0 && handle.coords[2] == 0) {
-    printf("%s sum = %lg\n", name, global_sum);
+    printf("%s sum = %.15g\n", name, global_sum);
     //printf("%s rms = %2.15lg\n",name, sqrt(global_sum)/((double)(app.nx_g*app.ny_g*app.nz_g)));
   }
 

@@ -36,7 +36,7 @@
 template<typename REAL>
 __device__ void pcr_step(REAL *a, REAL *c, REAL *d, const int n, const int s) {
   int tridNum = blockIdx.x;
-  int i = threadIdx.x * 2;
+  int i = threadIdx.x * 2 + 1;
   int ind = tridNum * n + i;
   
   REAL a_m, a_i, a_p;
@@ -82,9 +82,21 @@ __device__ void pcr_step(REAL *a, REAL *c, REAL *d, const int n, const int s) {
 template<typename REAL>
 __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const int P) {
   int tridNum = blockIdx.x;
-  int i = threadIdx.x * 2;
+  int i = threadIdx.x * 2 + 1;
   int ind = tridNum * n + i;
-  
+
+  if(i >= n) {
+    __syncthreads();
+    __syncthreads();
+
+    for(int p = 1; p <= P; p++) {
+      __syncthreads();
+    }
+    
+    __syncthreads();
+    return;
+  }
+
   REAL a_m, a_i, a_p;
   REAL c_m, c_i, c_p;
   REAL d_m, d_i, d_p;
@@ -92,28 +104,16 @@ __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, co
   a_i = a[ind];
   c_i = c[ind];
   d_i = d[ind];
-  
-  if(i - 1 < 0) {
-    a_m = (REAL) 0.0;
-    c_m = (REAL) 0.0;
-    d_m = (REAL) 0.0;
-    
-    a_p = a[ind + 1];
-    c_p = c[ind + 1];
-    d_p = d[ind + 1];
-  } else if(i + 1 >= n) {
-    a_m = a[ind - 1];
-    c_m = a[ind - 1];
-    d_m = a[ind - 1];
-    
+
+  a_m = a[ind - 1];
+  c_m = a[ind - 1];
+  d_m = a[ind - 1];
+
+  if(i + 1 >= n) { 
     a_p = (REAL) 0.0;
     c_p = (REAL) 0.0;
     d_p = (REAL) 0.0;
   } else {
-    a_m = a[ind - 1];
-    c_m = a[ind - 1];
-    d_m = a[ind - 1];
-    
     a_p = a[ind + 1];
     c_p = c[ind + 1];
     d_p = d[ind + 1];
@@ -132,34 +132,36 @@ __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, co
   __syncthreads();
   
   int s = 1;
-  for(int p = 1; p < P; p++) {
+  for(int p = 1; p <= P; p++) {
+    
     s = s << 1;
+
     pcr_step<REAL>(a, c, d, n, s);
     
     __syncthreads();
   }
-  
-  if(i + 1 >= n) {
-    d_i = d[ind];
-    
-    __syncthreads();
-    
-    d[ind] = d_i - a[ind] * d_i;
+
+  REAL d_m2;
+
+  if(i - 2 < 0) {
+    d_m2 = (REAL) 0.0;
   } else {
-    REAL d_i1, d_i2;
-    d_i = d[ind];
-    d_i1 = d[ind + 1];
-    if(i + 2 >= n) {
-      d_i2 = (REAL) 0.0;
-    } else {
-      d_i2 = d[ind + 2];
-    }
-    
-    __syncthreads();
-    
-    d[ind] = d_i - a[ind] * d_i - c[ind] * d_i1;
-    d[ind + 1] = d_i1 - a[ind + 1] * d_i1 - c[ind + 1] * d_i2;
+    d_m2 = d[ind - 2];
   }
+  
+  d_m = d[ind - 1];
+  d_i = d[ind];
+
+  if(i + 1 >= n) {
+    d_p = (REAL) 0.0;
+  } else {
+    d_p = d[ind + 1];
+  }
+   
+  __syncthreads();
+  
+  d[ind - 1] = d[ind - 1] - a[ind - 1] * d_m2 - c[ind - 1] * d_i;
+  d[ind] = d[ind] - a[ind] * d_m - c[ind] * d_p;
 }
 
 #endif
