@@ -38,10 +38,12 @@
 
 #include "trid_linear_mpi.hpp"
 #include "trid_strided_multidim_mpi.hpp"
+#include "trid_cuda_mpi_pcr.hpp"
 #include <cassert>
 #include <functional>
 #include <numeric>
 #include <type_traits>
+#include <cmath>
 
 //
 // Thomas solver for reduced systems
@@ -55,13 +57,14 @@
 template <typename REAL>
 void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord) {
-  std::vector<REAL> h_aa_r(2 * num_proc * sys_n), h_cc_r(2 * num_proc * sys_n), 
-                    h_dd_r(2 * num_proc * sys_n);
+  const int reducedSize = 2 * num_proc * sys_n;
+  
+  std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
   
   REAL *aa_r, *cc_r, *dd_r;
-  cudaMalloc(&aa_r, 2 * num_proc * sys_n * sizeof(REAL));
-  cudaMalloc(&cc_r, 2 * num_proc * sys_n * sizeof(REAL));
-  cudaMalloc(&dd_r, 2 * num_proc * sys_n * sizeof(REAL));
+  cudaMalloc(&aa_r, reducedSize * sizeof(REAL));
+  cudaMalloc(&cc_r, reducedSize * sizeof(REAL));
+  cudaMalloc(&dd_r, reducedSize * sizeof(REAL));
                     
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
@@ -78,15 +81,16 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
     }
   }
   
-  cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
-  cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
-  cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyHostToDevice);
+  cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
+  cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
+  cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
   
-  // TODO call PCR
-  
+  // Call PCR
+  P = (int) ceil(log2(reducedSize));
+  pcr_on_reduced_kernel<REAL><<<,>>>(aa_r, cc_r, dd_r, reducedSize, P);
   
   // TODO change to kernel that places straight in boundaries array
-  cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * 2 * num_proc * sys_n, cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost);
   
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
