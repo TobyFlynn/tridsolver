@@ -39,6 +39,9 @@
 #include "trid_linear_mpi.hpp"
 #include "trid_strided_multidim_mpi.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
+
+#include "cutil_inline.h"
+
 #include <cassert>
 #include <functional>
 #include <numeric>
@@ -62,9 +65,9 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
   
   REAL *aa_r, *cc_r, *dd_r;
-  cudaMalloc(&aa_r, reducedSize * sizeof(REAL));
-  cudaMalloc(&cc_r, reducedSize * sizeof(REAL));
-  cudaMalloc(&dd_r, reducedSize * sizeof(REAL));
+  cudaSafeCall( cudaMalloc(&aa_r, reducedSize * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&cc_r, reducedSize * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&dd_r, reducedSize * sizeof(REAL)) );
                     
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
@@ -81,22 +84,29 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
     }
   }
   
-  cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
-  cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
-  cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
+  cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   
   // Call PCR
   int P = (int) ceil(log2((REAL)reducedSize));
   pcr_on_reduced_kernel<REAL><<<sys_n,reducedSize / 2>>>(aa_r, cc_r, dd_r, reducedSize, P);
   
+  cudaSafeCall( cudaPeekAtLastError() );
+  cudaSafeCall( cudaDeviceSynchronize() );
+  
   // TODO change to kernel that places straight in boundaries array
-  cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost) );
   
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
     results[2 * eq_idx + 0] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 0)];
     results[2 * eq_idx + 1] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 1)];
   }
+  
+  cudaSafeCall( cudaFree(aa_r) );
+  cudaSafeCall( cudaFree(cc_r) );
+  cudaSafeCall( cudaFree(dd_r);
 }
 
 template <typename REAL, int INC>
@@ -132,10 +142,10 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   const int local_helper_size = outer_size * eq_stride * local_eq_size;
   REAL *aa, *cc, *dd, *boundaries;
-  cudaMalloc(&aa, local_helper_size * sizeof(REAL));
-  cudaMalloc(&cc, local_helper_size * sizeof(REAL));
-  cudaMalloc(&dd, local_helper_size * sizeof(REAL));
-  cudaMalloc(&boundaries, sys_n * 6 * sizeof(REAL));
+  cudaSafeCall( cudaMalloc(&aa, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&cc, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&boundaries, sys_n * 6 * sizeof(REAL)) );
 
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
@@ -149,6 +159,8 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     trid_linear_forward<REAL>
         <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
                                     local_eq_size, local_eq_size, sys_n);
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   } else {
     DIM_V pads, dims; // TODO
     for (int i = 0; i < ndim; ++i) {
@@ -158,13 +170,15 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
         ndim, solvedim, sys_n, dims);
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   }
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = 6 * sys_n;
   std::vector<REAL> send_buf(comm_buf_size),
       receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
-  cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
-             cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
+             cudaMemcpyDeviceToHost) );
   // Communicate boundary results
   MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                 receive_buf.data(), comm_buf_size, real_datatype,
@@ -176,12 +190,14 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
-  cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * 2 * sys_n,
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * 2 * sys_n,
+             cudaMemcpyHostToDevice) );
 
   if (solvedim == 0) {
     trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
         aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   } else {
     DIM_V pads, dims; // TODO
     for (int i = 0; i < ndim; ++i) {
@@ -191,12 +207,14 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
                                     boundaries, ndim, solvedim, sys_n, dims);
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
   }
 
-  cudaFree(aa);
-  cudaFree(cc);
-  cudaFree(dd);
-  cudaFree(boundaries);
+  cudaSafeCall( cudaFree(aa) );
+  cudaSafeCall( cudaFree(cc) );
+  cudaSafeCall( cudaFree(dd) );
+  cudaSafeCall( cudaFree(boundaries) );
 }
 
 template <typename REAL, int INC>
