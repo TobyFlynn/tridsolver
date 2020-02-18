@@ -85,6 +85,14 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
     }
   }
   
+  /*
+  * Included for debugging
+  for(size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
+    int ind = eq_idx * reducedSysLen;
+    thomas_on_reduced<REAL>(h_aa_r.data() + ind, h_cc_r.data() + ind, h_dd_r.data() + ind, reducedSysLen, 1);
+  }
+  */
+  
   cudaSafeCall( cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
