@@ -34,7 +34,7 @@
 #define __TRID_CUDA_MPI_PCR_HPP
 
 template<typename REAL>
-__device__ pcr_step(REAL *a, REAL *c, REAL *d, const int n, const int s) {
+__device__ void pcr_step(REAL *a, REAL *c, REAL *d, const int n, const int s) {
   int tridNum = blockIdx.x;
   int i = threadIdx.x * 2;
   int ind = tridNum * n + i;
@@ -80,7 +80,7 @@ __device__ pcr_step(REAL *a, REAL *c, REAL *d, const int n, const int s) {
  * For now assume one trid per block, with (number of elements) / 2 threads per block
  */
 template<typename REAL>
-__global__ pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const int P) {
+__global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const int P) {
   int tridNum = blockIdx.x;
   int i = threadIdx.x * 2;
   int ind = tridNum * n + i;
@@ -133,7 +133,7 @@ __global__ pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, const int n, const i
   
   int s = 1;
   for(int p = 1; p < P; p++) {
-    s << 1;
+    s = s << 1;
     pcr_step<REAL>(a, c, d, n, s);
     
     __syncthreads();

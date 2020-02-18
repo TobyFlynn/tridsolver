@@ -86,8 +86,8 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice);
   
   // Call PCR
-  P = (int) ceil(log2(reducedSize));
-  pcr_on_reduced_kernel<REAL><<<,>>>(aa_r, cc_r, dd_r, reducedSize, P);
+  int P = (int) ceil(log2((REAL)reducedSize));
+  pcr_on_reduced_kernel<REAL><<<sys_n,reducedSize / 2>>>(aa_r, cc_r, dd_r, reducedSize, P);
   
   // TODO change to kernel that places straight in boundaries array
   cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost);
