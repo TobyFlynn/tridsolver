@@ -98,11 +98,18 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   
   // Call PCR
-  int P = (int) ceil(log2((REAL)reducedSysLen));
+  /*int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
   int numThreads =  reducedSysLen / 2;
   printf("Blocks %d, Threads %d, P %d, 2^P %d, N %d\n", numBlocks, numThreads, P, 1 << P, reducedSysLen);
-  pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
+  pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);*/
+  
+  
+  int P = (int) ceil(log2((REAL)reducedSysLen));
+  int numBlocks = sys_n;
+  int numThreads =  reducedSysLen;
+  printf("Blocks %d, Threads %d, P %d, 2^P %d, N %d\n", numBlocks, numThreads, P, 1 << P, reducedSysLen);
+  pure_pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
   
   cudaSafeCall( cudaPeekAtLastError() );
   cudaSafeCall( cudaDeviceSynchronize() );
