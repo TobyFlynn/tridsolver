@@ -164,7 +164,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // Calculate the minimum length of reduced systems possible
   const int min_reduced_len_g = 2 * params.num_mpi_procs[solvedim];
   // Set the reduced system length to this minimum
-  int reduced_len_g = min_reduced_len;
+  int reduced_len_g = min_reduced_len_g;
   
   // If replacing MAX_REDUCED_LEN with number based on memory size in future, then 
   // should throw error if min_reduced_len > MAX_REDUCED_LEN
