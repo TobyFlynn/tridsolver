@@ -332,7 +332,6 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const DIM_V a_pads,
   }
   
   ind_a += offset;
-  ind_b += offset;
   ind_c += offset;
   ind_d += offset;
   ind_u += offset;
