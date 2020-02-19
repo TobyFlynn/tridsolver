@@ -80,12 +80,12 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
     const size_t buf_size = split_factor * 2 * 3 * sys_n;
     for (int i = 0; i < num_proc; ++i) {
       for (int j = 0; j < split_factor; j++) {
-        h_aa_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 0];
-        h_aa_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 1];
-        h_cc_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 2];
-        h_cc_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 3];
-        h_dd_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 4];
-        h_dd_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 5];
+        h_aa_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 0];
+        h_aa_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 1];
+        h_cc_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 2];
+        h_cc_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 3];
+        h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 4];
+        h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 5];
       }
     }
   }
@@ -117,8 +117,8 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
     for (int j = 0; j < split_factor; j++) {
-      results[split_factor * 2 * eq_idx + 2 * j + 0] = h_dd_r[eq_idx * reducedSysLen + (split_factor * mpi_coord + 2 * j)];
-      results[split_factor * 2 * eq_idx + 2 * j + 1] = h_dd_r[eq_idx * reducedSysLen + (split_factor * mpi_coord + 2 * j + 1)];
+      results[split_factor * 2 * eq_idx + 2 * j + 0] = h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * mpi_coord + 2 * j)];
+      results[split_factor * 2 * eq_idx + 2 * j + 1] = h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * mpi_coord + 2 * j + 1)];
     }
   }
 
@@ -186,7 +186,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
 
-  int trid_split_factor = reduced_len_g / min_reduced_len_g;
+  int trid_split_factor = reduced_len_l / 2;
   int total_trids = sys_n * trid_split_factor;
   
   printf("min_reduced_len_g = %d\n", min_reduced_len_g);
