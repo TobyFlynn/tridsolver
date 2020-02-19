@@ -36,7 +36,7 @@
 #include "trid_mpi_cpu.hpp"
 #include "trid_mpi_cuda.hpp"
 
-#include "trid_linear_mpi.hpp"
+#include "trid_linear_mpi_pcr.hpp"
 #include "trid_strided_multidim_mpi.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
@@ -183,9 +183,12 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
 
+  int trid_split_factor = reduced_len_g / min_reduced_len_g;
+  int total_trids = sys_n * trid_split_factor;
+  
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
-  int dimgrid = 1 + (sys_n - 1) / blockdimx; // can go up to 65535
+  int dimgrid = 1 + (total_trids - 1) / blockdimx; // can go up to 65535
   int dimgridx = dimgrid % 65536;            // can go up to max 65535 on Fermi
   int dimgridy = 1 + dimgrid / 65536;
 
@@ -194,7 +197,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   if (solvedim == 0) {
     trid_linear_forward<REAL>
         <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
-                                    local_eq_size, local_eq_size, sys_n);
+                                    local_eq_size, local_eq_size, sys_n, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
