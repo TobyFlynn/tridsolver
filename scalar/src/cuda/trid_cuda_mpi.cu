@@ -234,7 +234,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   if (solvedim == 0) {
     trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
-        aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
+        aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {

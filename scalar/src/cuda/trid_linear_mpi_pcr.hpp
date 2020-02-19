@@ -117,14 +117,23 @@ __global__ void
 trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                      const REAL *__restrict__ dd, REAL *__restrict__ d,
                      REAL *__restrict__ u, const REAL *__restrict__ boundaries,
-                     int sys_size, int sys_pads, int sys_n) {
+                     int sys_size, int sys_pads, int sys_n, int split_factor) {
   // Thread ID in global scope - every thread solves one system
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
             blockIdx.x * blockDim.y * blockDim.x +
             blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
-  int ind = sys_pads * tid;
+  int totalTrids = sys_n * split_factor;
+  int offset = (tid % split_factor) * (sys_size / split_factor);
+  int ind = sys_pads * tid + offset;
+  int len;
+  
+  if(tid % split_factor == split_factor - 1) {
+    len = sys_size - offset;
+  } else {
+    len = sys_size / split_factor;
+  }
 
-  if (tid < sys_n) {
+  if (tid < totalTrids) {
     //
     // reverse pass
     //
@@ -134,7 +143,7 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
     else
       d[ind] = dd0;
 
-    for (int i = 1; i < sys_size - 1; i++) {
+    for (int i = 1; i < len - 1; i++) {
       REAL res = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * dd_last;
       if (INC)
         u[ind + i] += res;
@@ -142,9 +151,9 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
         d[ind + i] = res;
     }
     if (INC)
-      u[ind + sys_size - 1] += dd_last;
+      u[ind + len - 1] += dd_last;
     else
-      d[ind + sys_size - 1] = dd_last;
+      d[ind + len - 1] = dd_last;
   }
 }
 
