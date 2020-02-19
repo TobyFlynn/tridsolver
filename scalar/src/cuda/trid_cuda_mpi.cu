@@ -110,7 +110,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
   int numThreads =  reducedSysLen;
-  printf("Blocks %d, Threads %d, P %d, 2^P %d, N %d\n", numBlocks, numThreads, P, 1 << P, reducedSysLen);
+  //printf("Blocks %d, Threads %d, P %d, 2^P %d, N %d\n", numBlocks, numThreads, P, 1 << P, reducedSysLen);
   pure_pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
   
   cudaSafeCall( cudaPeekAtLastError() );

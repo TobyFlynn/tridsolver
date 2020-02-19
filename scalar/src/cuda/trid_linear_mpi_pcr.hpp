@@ -59,7 +59,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   int ind = sys_pads * tid + offset;
   int len;
   if(tid % split_factor == split_factor - 1) {
-    len = sys_n - offset + 1;
+    len = sys_size - offset;
   } else {
     len = sys_size / split_factor;
   }
