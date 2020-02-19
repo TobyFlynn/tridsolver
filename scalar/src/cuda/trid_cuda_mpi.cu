@@ -37,7 +37,7 @@
 #include "trid_mpi_cuda.hpp"
 
 #include "trid_linear_mpi_pcr.hpp"
-#include "trid_strided_multidim_mpi.hpp"
+#include "trid_strided_multidim_mpi_pcr.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
 #include "cutil_inline.h"
@@ -208,7 +208,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     }
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
-        ndim, solvedim, sys_n, dims);
+        ndim, solvedim, sys_n, dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
