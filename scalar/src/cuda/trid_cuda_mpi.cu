@@ -48,7 +48,7 @@
 #include <type_traits>
 #include <cmath>
 
-#define MAX_REDUCED_LEN 4
+#define MAX_REDUCED_LEN 8
 #define MIN_TRID_LEN 8
 
 //

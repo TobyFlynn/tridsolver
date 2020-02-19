@@ -194,10 +194,10 @@ __global__ void trid_strided_multidim_forward(
     len = sys_size / split_factor;
   }
   
-  ind_a += offset;
-  ind_b += offset;
-  ind_c += offset;
-  ind_d += offset;
+  ind_a += offset * stride_a;
+  ind_b += offset * stride_b;
+  ind_c += offset * stride_c;
+  ind_d += offset * stride_d;
 
   if (tid < totalTrids) {
     trid_strided_multidim_forward_kernel<REAL>(
@@ -331,10 +331,10 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const DIM_V a_pads,
     len = sys_size / split_factor;
   }
   
-  ind_a += offset;
-  ind_c += offset;
-  ind_d += offset;
-  ind_u += offset;
+  ind_a += offset * stride_a;
+  ind_c += offset * stride_c;
+  ind_d += offset * stride_d;
+  ind_u += offset * stride_u;
 
   if (tid < totalTrids) {
     trid_strided_multidim_backward_kernel<REAL, INC>(
