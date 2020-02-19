@@ -76,25 +76,19 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
     // The offset in the send and receive buffers
-    const size_t buf_offset = eq_idx * 6;
-    const size_t buf_size = 6 * sys_n;
+    const size_t buf_offset = eq_idx * split_factor * 2 * 3;
+    const size_t buf_size = split_factor * 2 * 3 * sys_n;
     for (int i = 0; i < num_proc; ++i) {
-      h_aa_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 0];
-      h_aa_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 1];
-      h_cc_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 2];
-      h_cc_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 3];
-      h_dd_r[eq_idx * num_proc * 2 + (2 * i + 0)] = receive_buf[buf_size * i + buf_offset + 4];
-      h_dd_r[eq_idx * num_proc * 2 + (2 * i + 1)] = receive_buf[buf_size * i + buf_offset + 5];
+      for (int j = 0; j < split_factor; j++) {
+        h_aa_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 0];
+        h_aa_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 1];
+        h_cc_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 2];
+        h_cc_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 3];
+        h_dd_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 4];
+        h_dd_r[eq_idx * reducedSysLen + (split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 5];
+      }
     }
   }
-  
-  /*
-  * Included for debugging
-  for(size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
-    int ind = eq_idx * reducedSysLen;
-    thomas_on_reduced<REAL>(h_aa_r.data() + ind, h_cc_r.data() + ind, h_dd_r.data() + ind, reducedSysLen, 1);
-  }
-  */
   
   cudaSafeCall( cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
@@ -122,8 +116,10 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
-    results[2 * eq_idx + 0] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 0)];
-    results[2 * eq_idx + 1] = h_dd_r[eq_idx * num_proc * 2 + (2 * mpi_coord + 1)];
+    for (int j = 0; j < split_factor; j++) {
+      results[split_factor * 2 * eq_idx + 2 * j + 0] = h_dd_r[eq_idx * reducedSysLen + (split_factor * mpi_coord + 2 * j)];
+      results[split_factor * 2 * eq_idx + 2 * j + 1] = h_dd_r[eq_idx * reducedSysLen + (split_factor * mpi_coord + 2 * j + 1)];
+    }
   }
   
   cudaSafeCall( cudaFree(aa_r) );
@@ -242,7 +238,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
-  cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * 2 * sys_n,
+  cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * reduced_len_l * sys_n,
              cudaMemcpyHostToDevice) );
 
   if (solvedim == 0) {
