@@ -67,12 +67,12 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   const int reducedSize = reducedSysLen * sys_n;
   
   std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
-  
+
   REAL *aa_r, *cc_r, *dd_r;
   cudaSafeCall( cudaMalloc(&aa_r, reducedSize * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&cc_r, reducedSize * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&dd_r, reducedSize * sizeof(REAL)) );
-                    
+
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
     // The offset in the send and receive buffers
@@ -93,7 +93,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   cudaSafeCall( cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
   cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
-  
+
   // Call PCR
   /*int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
@@ -121,7 +121,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
       results[split_factor * 2 * eq_idx + 2 * j + 1] = h_dd_r[eq_idx * reducedSysLen + (split_factor * mpi_coord + 2 * j + 1)];
     }
   }
-  
+
   cudaSafeCall( cudaFree(aa_r) );
   cudaSafeCall( cudaFree(cc_r) );
   cudaSafeCall( cudaFree(dd_r) );
@@ -224,7 +224,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
   std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(reduced_len_g);
+      receive_buf(reduced_len_g * 3 * sys_n);
   cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
              cudaMemcpyDeviceToHost) );
   // Communicate boundary results
