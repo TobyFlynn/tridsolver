@@ -45,53 +45,53 @@ EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
                                       const double *c, double *d, double *u,
-                                      int ndim, int solvedim, int *dims,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
                                       const float *c, float *d, float *u,
-                                      int ndim, int solvedim, int *dims,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const double *a, const double *b,
                                          const double *c, double *d, double *u,
-                                         int ndim, int solvedim, int *dims,
+                                         int ndim, int solvedim, int *dims, int *dims_g,
                                          int *pads);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const float *a, const float *b,
                                          const float *c, float *d, float *u,
-                                         int ndim, int solvedim, int *dims,
+                                         int ndim, int solvedim, int *dims, int *dims_g
                                          int *pads);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchPaddedMPI(
     const MpiSolverParams &params, const double *a, int *a_pads,
     const double *b, int *b_pads, const double *c, int *c_pads, double *d,
-    int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims);
+    int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims, int *dims_g);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchPaddedMPI(
     const MpiSolverParams &params, const float *a, int *a_pads, const float *b,
     int *b_pads, const float *c, int *c_pads, float *d, int *d_pads, float *u,
-    int *u_pads, int ndim, int solvedim, int *dims);
+    int *u_pads, int ndim, int solvedim, int *dims, int *dims_g);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchPaddedIncMPI(
     const MpiSolverParams &params, const double *a, int *a_pads,
     const double *b, int *b_pads, const double *c, int *c_pads, double *d,
-    int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims);
+    int *d_pads, double *u, int *u_pads, int ndim, int solvedim, int *dims, int *dims_g);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchPaddedIncMPI(
     const MpiSolverParams &params, const float *a, int *a_pads, const float *b,
     int *b_pads, const float *c, int *c_pads, float *d, int *d_pads, float *u,
-    int *u_pads, int ndim, int solvedim, int *dims);
+    int *u_pads, int ndim, int solvedim, int *dims, int *dims_g);
 
 
 #endif

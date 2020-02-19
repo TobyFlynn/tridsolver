@@ -389,7 +389,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size, app.size_g);
     
     timing_end(&timer, &elapsed_trid_x);
 
@@ -404,7 +404,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
 
-    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size, app.size_g);
     
     timing_end(&timer, &elapsed_trid_y);
     
@@ -419,7 +419,7 @@ int main(int argc, char* argv[]) {
     //
     timing_start(&timer);
     
-    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size);
+    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size, app.size_g);
     
     timing_end(&timer, &elapsed_trid_z);
   }
