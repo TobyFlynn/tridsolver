@@ -164,19 +164,19 @@ __global__ void trid_strided_multidim_forward(
   int ind_bound = tid * 6;
 
   for (int j = 0; j < solvedim; j++) {
-    ind_a += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[0][j];
-    ind_b += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[1][j];
-    ind_c += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[2][j];
-    ind_d += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[3][j];
+    ind_a += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[0][j];
+    ind_b += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[1][j];
+    ind_c += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[2][j];
+    ind_d += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[3][j];
   }
   for (int j = solvedim + 1; j < ndim; j++) {
-    ind_a += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_a += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[0][j];
-    ind_b += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_b += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[1][j];
-    ind_c += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_c += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[2][j];
-    ind_d += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_d += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[3][j];
   }
   int stride_a = d_cumpads[0][solvedim];
@@ -299,21 +299,21 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const DIM_V a_pads,
   int ind_bound = tid * 2; // 2 values per system since it hold only dd
 
   for (int j = 0; j < solvedim; j++) {
-    ind_a += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[0][j];
-    ind_c += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[1][j];
-    ind_d += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[2][j];
+    ind_a += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[0][j];
+    ind_c += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[1][j];
+    ind_d += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[2][j];
     if (INC)
-      ind_u += ((tid / d_cumdims[j]) % dims.v[j]) * d_cumpads[3][j];
+      ind_u += (((tid / split_factor) / d_cumdims[j]) % dims.v[j]) * d_cumpads[3][j];
   }
   for (int j = solvedim + 1; j < ndim; j++) {
-    ind_a += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_a += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[0][j];
-    ind_c += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_c += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[1][j];
-    ind_d += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+    ind_d += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
              d_cumpads[2][j];
     if (INC)
-      ind_u += ((tid / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
+      ind_u += (((tid / split_factor) / (d_cumdims[j] / dims.v[solvedim])) % dims.v[j]) *
                d_cumpads[3][j];
   }
   int stride_a = d_cumpads[0][solvedim];

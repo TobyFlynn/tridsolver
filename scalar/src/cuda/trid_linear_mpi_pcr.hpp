@@ -56,7 +56,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
             blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
   int totalTrids = sys_n * split_factor;
   int offset = (tid % split_factor) * (sys_size / split_factor);
-  int ind = sys_pads * tid + offset;
+  int ind = sys_pads * (tid / split_factor) + offset;
   int len;
   if(tid % split_factor == split_factor - 1) {
     len = sys_size - offset;
@@ -124,7 +124,7 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
             blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
   int totalTrids = sys_n * split_factor;
   int offset = (tid % split_factor) * (sys_size / split_factor);
-  int ind = sys_pads * tid + offset;
+  int ind = sys_pads * (tid / split_factor) + offset;
   int len;
   
   if(tid % split_factor == split_factor - 1) {

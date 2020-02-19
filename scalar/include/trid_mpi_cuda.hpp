@@ -66,7 +66,7 @@ EXTERN_C
 tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const float *a, const float *b,
                                          const float *c, float *d, float *u,
-                                         int ndim, int solvedim, int *dims, int *dims_g
+                                         int ndim, int solvedim, int *dims, int *dims_g,
                                          int *pads);
 
 EXTERN_C

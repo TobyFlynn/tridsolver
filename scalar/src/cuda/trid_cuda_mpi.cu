@@ -48,7 +48,7 @@
 #include <type_traits>
 #include <cmath>
 
-#define MAX_REDUCED_LEN 128
+#define MAX_REDUCED_LEN 4
 #define MIN_TRID_LEN 8
 
 //
@@ -62,7 +62,8 @@
 //
 template <typename REAL>
 void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
-                               int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
+                               int sys_n, int num_proc, int mpi_coord, int reducedSysLen, 
+                               int split_factor) {
   const int reducedSize = reducedSysLen * sys_n;
   
   std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
@@ -192,6 +193,12 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   int trid_split_factor = reduced_len_g / min_reduced_len_g;
   int total_trids = sys_n * trid_split_factor;
   
+  printf("min_reduced_len_g = %d\n", min_reduced_len_g);
+  printf("reduced_len_g = %d\n", reduced_len_g);
+  printf("reduced_len_l = %d\n", reduced_len_l);
+  printf("trid_split_factor = %d\n", trid_split_factor);
+  printf("total_trids = %d\n", total_trids); 
+
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
   int dimgrid = 1 + (total_trids - 1) / blockdimx; // can go up to 65535
@@ -219,9 +226,9 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaDeviceSynchronize() );
   }
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
-  const size_t comm_buf_size = 6 * sys_n;
+  const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
   std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
+      receive_buf(reduced_len_g);
   cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
              cudaMemcpyDeviceToHost) );
   // Communicate boundary results
@@ -231,7 +238,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // solve reduced systems, and store results in send_buf
   thomas_on_reduced_batched<REAL>(receive_buf.data(), send_buf.data(), sys_n,
                                   params.num_mpi_procs[solvedim],
-                                  params.mpi_coords[solvedim], reduced_len_g);
+                                  params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
@@ -310,7 +317,7 @@ tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                       int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads) {
   tridMultiDimBatchSolveMPI<float, 1>(params, a, b, c, d, u, ndim, solvedim,
-                                      dims, pads);
+                                      dims, dims_g, pads);
   return TRID_STATUS_SUCCESS;
 }
 
