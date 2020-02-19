@@ -221,12 +221,22 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
+  
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
   std::vector<REAL> send_buf(comm_buf_size),
       receive_buf(reduced_len_g * 3 * sys_n);
   cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
              cudaMemcpyDeviceToHost) );
+  
+  // *** DEBUG CODE ***
+  double sum = 0.0;
+  for(int i = 0; i < comm_buf_size; i++) {
+    sum += send_buf.data()[i];
+  }
+  printf("Send buffer data sum 1 = %d\n", sum);
+  // ******************
+  
   // Communicate boundary results
   MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                 receive_buf.data(), comm_buf_size, real_datatype,
@@ -236,6 +246,14 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                   params.num_mpi_procs[solvedim],
                                   params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
 
+  // *** DEBUG CODE ***
+  sum = 0.0;
+  for(int i = 0; i < reduced_len_l * sys_n; i++) {
+    sum += send_buf.data()[i];
+  }
+  printf("Send buffer data sum 2 = %d\n", sum);
+  // ******************
+  
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
   cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * reduced_len_l * sys_n,
