@@ -48,6 +48,9 @@
 #include <type_traits>
 #include <cmath>
 
+#define MAX_REDUCED_LEN 128
+#define MIN_TRID_LEN 8
+
 //
 // Thomas solver for reduced systems
 //
@@ -59,8 +62,7 @@
 //
 template <typename REAL>
 void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
-                               int sys_n, int num_proc, int mpi_coord) {
-  const int reducedSysLen = 2 * num_proc;
+                               int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
   const int reducedSize = reducedSysLen * sys_n;
   
   std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
@@ -158,13 +160,28 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   const MPI_Datatype real_datatype =
       std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
+  
+  // Calculate the minimum length of reduced systems possible
+  const int min_reduced_len_g = 2 * params.num_mpi_procs[solvedim];
+  // Set the reduced system length to this minimum
+  int reduced_len_g = min_reduced_len;
+  
+  // If replacing MAX_REDUCED_LEN with number based on memory size in future, then 
+  // should throw error if min_reduced_len > MAX_REDUCED_LEN
+  // See if length of reduced system can be increased.
+  if(reduced_len_g < MAX_REDUCED_LEN) {
+    // TODO
+  }
+  
+  // Calculate how many local elements are part of the global reduced system
+  int reduced_len_l = reduced_len_g / params.num_mpi_procs[solvedim];
 
   const int local_helper_size = outer_size * eq_stride * local_eq_size;
   REAL *aa, *cc, *dd, *boundaries;
   cudaSafeCall( cudaMalloc(&aa, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&cc, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
-  cudaSafeCall( cudaMalloc(&boundaries, sys_n * 6 * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
 
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
@@ -205,7 +222,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // solve reduced systems, and store results in send_buf
   thomas_on_reduced_batched<REAL>(receive_buf.data(), send_buf.data(), sys_n,
                                   params.num_mpi_procs[solvedim],
-                                  params.mpi_coords[solvedim]);
+                                  params.mpi_coords[solvedim], reduced_len_g);
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
