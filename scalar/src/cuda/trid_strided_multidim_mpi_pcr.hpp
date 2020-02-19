@@ -187,7 +187,6 @@ __global__ void trid_strided_multidim_forward(
   
   int totalTrids = sys_n * split_factor;
   int offset = (tid % split_factor) * (sys_size / split_factor);
-  //int ind = sys_pads * tid + offset;
   int len;
   if(tid % split_factor == split_factor - 1) {
     len = sys_size - offset;
@@ -247,7 +246,7 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const DIM_V a_pads,
                                REAL *__restrict__ d, const DIM_V d_pads,
                                REAL *__restrict__ u, const DIM_V u_pads,
                                const REAL *__restrict__ boundaries, int ndim,
-                               int solvedim, int sys_n, const DIM_V dims) {
+                               int solvedim, int sys_n, const DIM_V dims, int split_factor) {
   // thread ID in block
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
             threadIdx.z * blockDim.x * blockDim.y;
@@ -322,11 +321,26 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const DIM_V a_pads,
   int stride_d = d_cumpads[2][solvedim];
   int stride_u = d_cumpads[3][solvedim];
   int sys_size = dims.v[solvedim];
+  
+  int totalTrids = sys_n * split_factor;
+  int offset = (tid % split_factor) * (sys_size / split_factor);
+  int len;
+  if(tid % split_factor == split_factor - 1) {
+    len = sys_size - offset;
+  } else {
+    len = sys_size / split_factor;
+  }
+  
+  ind_a += offset;
+  ind_b += offset;
+  ind_c += offset;
+  ind_d += offset;
+  ind_u += offset;
 
-  if (tid < sys_n) {
+  if (tid < totalTrids) {
     trid_strided_multidim_backward_kernel<REAL, INC>(
         aa, ind_a, stride_a, cc, ind_c, stride_c, dd, d, ind_d, stride_d, u,
-        ind_u, stride_u, boundaries, ind_bound, sys_size);
+        ind_u, stride_u, boundaries, ind_bound, len);
   }
 }
 
