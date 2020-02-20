@@ -152,6 +152,10 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   const int outer_size = std::accumulate(dims + solvedim + 1, dims + ndim, 1,
                                          std::multiplies<int>{});
 
+  int *d_dims = NULL;
+  cudaSafeCall( cudaMalloc(&d_dims, 3 * sizeof(int)) );
+  cudaSafeCall( cudaMemcpy(d_dims, dims, sizeof(int) * 3, cudaMemcpyHostToDevice) );
+  
   // The number of systems to solve
   const int sys_n = eq_stride * outer_size;
 
@@ -220,7 +224,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
         ndim, solvedim, sys_n, dims, trid_split_factor);*/
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, b, c, d, aa, cc, dd, boundaries,
-        solvedim, sys_n, dims, trid_split_factor);
+        solvedim, sys_n, d_dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
@@ -278,7 +282,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                     boundaries, ndim, solvedim, sys_n, dims, trid_split_factor);*/
     trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u,
-                                    boundaries, solvedim, sys_n, dims, trid_split_factor);
+                                    boundaries, solvedim, sys_n, d_dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
@@ -287,6 +291,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaFree(cc) );
   cudaSafeCall( cudaFree(dd) );
   cudaSafeCall( cudaFree(boundaries) );
+  cudaSafeCall( cudaFree(d_dims) );
 }
 
 template <typename REAL, int INC>

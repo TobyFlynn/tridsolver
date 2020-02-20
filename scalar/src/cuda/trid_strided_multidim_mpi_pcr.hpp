@@ -91,12 +91,12 @@ __device__ void trid_strided_multidim_forward_kernel(
     cc[ind] = bb * (-cc[ind] * cc[ind + stride]);
   }
   // prepare boundaries for communication
-  boundaries[ind_bound + 0] = aa[ind_a];
-  boundaries[ind_bound + 1] = aa[ind_a + (sys_size - 1) * stride_a];
-  boundaries[ind_bound + 2] = cc[ind_c];
-  boundaries[ind_bound + 3] = cc[ind_c + (sys_size - 1) * stride_c];
-  boundaries[ind_bound + 4] = dd[ind_d];
-  boundaries[ind_bound + 5] = dd[ind_d + (sys_size - 1) * stride_d];
+  boundaries[ind_bound + 0] = aa[ind];
+  boundaries[ind_bound + 1] = aa[ind + (sys_size - 1) * stride];
+  boundaries[ind_bound + 2] = cc[ind];
+  boundaries[ind_bound + 3] = cc[ind + (sys_size - 1) * stride];
+  boundaries[ind_bound + 4] = dd[ind];
+  boundaries[ind_bound + 5] = dd[ind + (sys_size - 1) * stride];
 }
 
 template <typename REAL>
@@ -109,7 +109,7 @@ __global__ void trid_strided_multidim_forward(
   // set up indices for main block
   //
   // Thread ID in global scope - every thread solves one system
-  tid = threadIdx.x + threadIdx.y * blockDim.x +
+  int tid = threadIdx.x + threadIdx.y * blockDim.x +
         blockIdx.x * blockDim.y * blockDim.x +
         blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
 
@@ -185,7 +185,7 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restri
   // set up indices for main block
   //
   // Thread ID in global scope - every thread solves one system
-  tid = threadIdx.x + threadIdx.y * blockDim.x +
+  int tid = threadIdx.x + threadIdx.y * blockDim.x +
         blockIdx.x * blockDim.y * blockDim.x +
         blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
 
