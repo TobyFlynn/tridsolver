@@ -105,13 +105,15 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
   int numThreads =  reducedSysLen;
-  pure_pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
+  //pure_pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, reducedSysLen, P);
+  pure_pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, results, 
+                                                    split_factor, mpi_coord, reducedSysLen, P);
   
   cudaSafeCall( cudaPeekAtLastError() );
   cudaSafeCall( cudaDeviceSynchronize() );
   
-  // TODO change to kernel that places straight in boundaries array
-  cudaSafeCall( cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost) );
+  // Kernel now places straight in boundaries array
+  /*cudaSafeCall( cudaMemcpy(h_dd_r.data(), dd_r, sizeof(REAL) * reducedSize, cudaMemcpyDeviceToHost) );
   
   #pragma omp parallel for
   for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
@@ -119,7 +121,7 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
       results[split_factor * 2 * eq_idx + 2 * j + 0] = h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * mpi_coord + 2 * j)];
       results[split_factor * 2 * eq_idx + 2 * j + 1] = h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * mpi_coord + 2 * j + 1)];
     }
-  }
+  }*/
 
   cudaSafeCall( cudaFree(aa_r) );
   cudaSafeCall( cudaFree(cc_r) );
@@ -226,14 +228,18 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                 receive_buf.data(), comm_buf_size, real_datatype,
                 params.communicators[solvedim]);
   // solve reduced systems, and store results in send_buf
-  thomas_on_reduced_batched<REAL>(receive_buf.data(), send_buf.data(), sys_n,
+  /*thomas_on_reduced_batched<REAL>(receive_buf.data(), send_buf.data(), sys_n,
+                                  params.num_mpi_procs[solvedim],
+                                  params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);*/
+  
+  thomas_on_reduced_batched<REAL>(receive_buf.data(), boundaries, sys_n, 
                                   params.num_mpi_procs[solvedim],
                                   params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
-  cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * reduced_len_l * sys_n,
-             cudaMemcpyHostToDevice) );
+  /*cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * reduced_len_l * sys_n,
+             cudaMemcpyHostToDevice) );*/
 
   if (solvedim == 0) {
     trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
