@@ -220,8 +220,8 @@ __global__ void pure_pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, REAL *resu
     s = s << 1;
   }
   
-  if(i >= split_factor * mpi_coord && i < split_factor * (mpi_coord + 1)) {
-    int reduced_ind_l = i - (split_factor * mpi_coord);
+  if(i >= 2 * split_factor * mpi_coord && i < 2 * split_factor * (mpi_coord + 1)) {
+    int reduced_ind_l = i - (2 * split_factor * mpi_coord);
     results[split_factor * 2 * tridNum + reduced_ind_l] = d[ind];
   }
 }
