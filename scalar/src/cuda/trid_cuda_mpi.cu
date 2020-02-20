@@ -210,14 +210,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    DIM_V pads, dims; // TODO
+    /*DIM_V pads, dims; // TODO
     for (int i = 0; i < ndim; ++i) {
       pads.v[i] = a_pads[i];
       dims.v[i] = a_pads[i];
-    }
-    trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
+    }*/
+    /*trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
-        ndim, solvedim, sys_n, dims, trid_split_factor);
+        ndim, solvedim, sys_n, dims, trid_split_factor);*/
+    trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
+        a, b, c, d, aa, cc, dd, boundaries,
+        solvedim, sys_n, dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
@@ -230,11 +233,11 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
              cudaMemcpyDeviceToHost) );
   
   // *** DEBUG CODE ***
-  double sum = 0.0;
+  /*double sum = 0.0;
   for(int i = 0; i < comm_buf_size; i++) {
     sum += send_buf.data()[i];
   }
-  printf("Send buffer data sum 1 = %d\n", sum);
+  printf("Send buffer data sum 1 = %d\n", sum);*/
   // ******************
   
   // Communicate boundary results
@@ -247,11 +250,11 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                   params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
 
   // *** DEBUG CODE ***
-  sum = 0.0;
+  /*sum = 0.0;
   for(int i = 0; i < reduced_len_l * sys_n; i++) {
     sum += send_buf.data()[i];
   }
-  printf("Send buffer data sum 2 = %d\n", sum);
+  printf("Send buffer data sum 2 = %d\n", sum);*/
   // ******************
   
   // copy the results of the reduced systems to the beginning of the boundaries
@@ -265,14 +268,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    DIM_V pads, dims; // TODO
+    /*DIM_V pads, dims; // TODO
     for (int i = 0; i < ndim; ++i) {
       pads.v[i] = a_pads[i];
       dims.v[i] = a_pads[i];
-    }
-    trid_strided_multidim_backward<REAL, INC>
+    }*/
+    /*trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
-                                    boundaries, ndim, solvedim, sys_n, dims, trid_split_factor);
+                                    boundaries, ndim, solvedim, sys_n, dims, trid_split_factor);*/
+    trid_strided_multidim_backward<REAL, INC>
+        <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u,
+                                    boundaries, solvedim, sys_n, dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
