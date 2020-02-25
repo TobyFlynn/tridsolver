@@ -366,11 +366,11 @@ int main(int argc, char* argv[]) {
     
     timing_start(&timer);
 
-    cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
+    /*cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
     cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
     rms("start h_u", h_u, app);
-    rms("start du", du, app);
+    rms("start du", du, app);*/
     
     preproc_mpi_cuda<FP>(pre_handle, app);
     
@@ -378,41 +378,41 @@ int main(int argc, char* argv[]) {
 
     cudaSafeCall( cudaDeviceSynchronize() );
 
-    cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
+    /*cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
     cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
     rms("preproc h_u", h_u, app);
-    rms("preproc du", du, app);
+    rms("preproc du", du, app);*/
 
     //
     // perform tri-diagonal solves in x-direction
     //
     timing_start(&timer);
     
-    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size, app.size_g);
+    tridDmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size, app.size_g);
     
     timing_end(&timer, &elapsed_trid_x);
 
-    cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
+    /*cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
     cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
     rms("x h_u", h_u, app);
-    rms("x du", du, app);
+    rms("x du", du, app);*/
 
     //
     // perform tri-diagonal solves in y-direction
     //
     timing_start(&timer);
 
-    tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size, app.size_g);
+    tridDmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size, app.size_g);
     
     timing_end(&timer, &elapsed_trid_y);
     
-    cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
+    /*cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
     cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
     rms("y h_u", h_u, app);
-    rms("y du", du, app);
+    rms("y du", du, app);*/
 
     //
     // perform tri-diagonal solves in z-direction
