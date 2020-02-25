@@ -112,26 +112,28 @@ __global__ void trid_strided_multidim_forward(
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
         blockIdx.x * blockDim.y * blockDim.x +
         blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
+  int tridNum = tid % sys_n;
+  int subTridNum = tid / sys_n;
 
   int ind;
   int stride;
   
   if(solvedim == 1) {
-    ind = ((tid / split_factor) / dims[0]) * dims[0] * dims[1] + ((tid / split_factor) % dims[0]);
+    ind = (tridNum / dims[0]) * dims[0] * dims[1] + (tridNum % dims[0]);
     stride = dims[0];
   } else {
-    ind = (tid / split_factor);
+    ind = tridNum;
     stride = dims[0] * dims[1];
   }
   
-  int ind_bound = tid * 6;
+  int ind_bound = (tridNum * split_factor + subTridNum) * 6;
   int sys_size = dims[solvedim];
   
   int totalTrids = sys_n * split_factor;
-  int offset = (tid % split_factor) * (sys_size / split_factor);
+  int offset = subTridNum * (sys_size / split_factor);
   int len;
   
-  if(tid % split_factor == split_factor - 1) {
+  if(subTridNum == split_factor - 1) {
     len = sys_size - offset;
   } else {
     len = sys_size / split_factor;
@@ -189,25 +191,28 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restri
         blockIdx.x * blockDim.y * blockDim.x +
         blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
 
+  int tridNum = tid % sys_n;
+  int subTridNum = tid / sys_n;
+  
   int ind;
   int stride;
   
   if(solvedim == 1) {
-    ind = ((tid / split_factor) / dims[0]) * dims[0] * dims[1] + ((tid / split_factor) % dims[0]);
+    ind = (tridNum / dims[0]) * dims[0] * dims[1] + (tridNum % dims[0]);
     stride = dims[0];
   } else {
-    ind = (tid / split_factor);
+    ind = tridNum;
     stride = dims[0] * dims[1];
   }
   
-  int ind_bound = tid * 2;
+  int ind_bound = (tridNum * split_factor + subTridNum) * 2;
   int sys_size = dims[solvedim];
   
   int totalTrids = sys_n * split_factor;
-  int offset = (tid % split_factor) * (sys_size / split_factor);
+  int offset = subTridNum * (sys_size / split_factor);
   int len;
   
-  if(tid % split_factor == split_factor - 1) {
+  if(subTridNum == split_factor - 1) {
     len = sys_size - offset;
   } else {
     len = sys_size / split_factor;
