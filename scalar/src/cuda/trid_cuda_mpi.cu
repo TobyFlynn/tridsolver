@@ -250,10 +250,10 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
 
   const int local_helper_size = outer_size * eq_stride * local_eq_size;
   REAL *aa, *cc, *dd, *boundaries;
-  cudaMalloc(&aa, local_helper_size * sizeof(REAL));
-  cudaMalloc(&cc, local_helper_size * sizeof(REAL));
-  cudaMalloc(&dd, local_helper_size * sizeof(REAL));
-  cudaMalloc(&boundaries, sys_n * 6 * sizeof(REAL));
+  cudaSafeCall( cudaMalloc(&aa, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&cc, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
+  cudaSafeCall( cudaMalloc(&boundaries, sys_n * 6 * sizeof(REAL)) );
 
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
@@ -291,8 +291,8 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
   const size_t comm_buf_size = 6 * sys_n;
   std::vector<REAL> send_buf(comm_buf_size),
       receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
-  cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
-             cudaMemcpyDeviceToHost);
+  cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
+             cudaMemcpyDeviceToHost) );
   // Communicate boundary results
   MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                 receive_buf.data(), comm_buf_size, real_datatype,
@@ -307,8 +307,8 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
 
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
-  cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * 2 * sys_n,
-             cudaMemcpyHostToDevice);
+  cudaSafeCall( cudaMemcpy(boundaries, send_buf.data(), sizeof(REAL) * 2 * sys_n,
+             cudaMemcpyHostToDevice) );
   
   timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][3], params.communicators[solvedim]);
 
@@ -332,10 +332,10 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
   
   timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][4], params.communicators[solvedim]);
 
-  cudaFree(aa);
-  cudaFree(cc);
-  cudaFree(dd);
-  cudaFree(boundaries);
+  cudaSafeCall( cudaFree(aa) );
+  cudaSafeCall( cudaFree(cc) );
+  cudaSafeCall( cudaFree(dd) );
+  cudaSafeCall( cudaFree(boundaries) );
 }
 
 template <typename REAL, int INC>
