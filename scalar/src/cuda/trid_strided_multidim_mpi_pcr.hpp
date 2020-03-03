@@ -99,7 +99,7 @@ __device__ void trid_strided_multidim_forward_kernel(
   boundaries[ind_bound + 5] = dd[ind + (sys_size - 1) * stride];
 }
 
-template <typename REAL, int BLOCKING_FACTOR>
+template <typename REAL>//, int BLOCKING_FACTOR>
 __global__ void trid_strided_multidim_forward(
     const REAL *__restrict__ a, const REAL *__restrict__ b,
     const REAL *__restrict__ c, const REAL *__restrict__ d, REAL *__restrict__ aa,
@@ -179,7 +179,7 @@ __device__ void trid_strided_multidim_backward_kernel(
   else       u[ind + (sys_size - 1) * stride] += dd_last;
 }
 
-template <typename REAL, int BLOCKING_FACTOR, int INC>
+template <typename REAL/*, int BLOCKING_FACTOR*/, int INC>
 __global__ void
 trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                                const REAL *__restrict__ dd, REAL *__restrict__ d,
