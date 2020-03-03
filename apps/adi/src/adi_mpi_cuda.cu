@@ -211,14 +211,14 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   app.size_g[2] = nz_g;
   
   int procs, rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &procs);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &app.procs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &app.rank);
 
   // Create rectangular grid
   app.pdims    = (int *) calloc(3, sizeof(int));
   int *periodic = (int *) calloc(3, sizeof(int)); //false
   app.coords   = (int *) calloc(3, sizeof(int));
-  MPI_Dims_create(procs, 3, app.pdims);
+  MPI_Dims_create(app.procs, 3, app.pdims);
   
   // Create cartecian mpi comm
   MPI_Cart_create(MPI_COMM_WORLD, 3, app.pdims, periodic, 0,  &app.comm);
@@ -456,15 +456,15 @@ int main(int argc, char* argv[]) {
   MPI_Reduce(trid_timing.elapsed_time[0], timers_avg, 5, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(&elapsed_trid_x, &avg_total, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     for(int i=0; i<5; i++)
-        timers_avg[i] /= mpi_handle.procs;
+        timers_avg[i] /= app.procs;
     
-    avg_total /= mpi_handle.procs;
+    avg_total /= app.procs;
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     printf("Average time in trid-x segments[ms]: \n[total] \t[%s] \t[%s] \t[%s] \t[%s] \t[%s] \n",
             elapsed_name[0], elapsed_name[1], elapsed_name[2], elapsed_name[3], elapsed_name[4]);
     printf("%lf \t%lf \t%lf \t%lf \t%lf \t%lf\n",
@@ -485,18 +485,18 @@ int main(int argc, char* argv[]) {
   MPI_Reduce(trid_timing.elapsed_time[1], timers_avg, 5, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(&elapsed_trid_y, &avg_total, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     for(int i=0; i<5; i++)
-        timers_avg[i] /= mpi_handle.procs;
+        timers_avg[i] /= app.procs;
     
-    avg_total /= mpi_handle.procs;
+    avg_total /= app.procs;
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     printf("Average time in trid-y segments[ms]: \n[total] \t[%s] \t[%s] \t[%s] \t[%s] \t[%s] \n",
             elapsed_name[0], elapsed_name[1], elapsed_name[2], elapsed_name[3], elapsed_name[4]);
-    printf("%lf \t%lf \t%lf \t%lf \t%lf \t%lf \t%lf \t%lf \t%lf \t%lf\n",
+    printf("%lf \t%lf \t%lf \t%lf \t%lf \t%lf\n",
         1000.0*avg_total ,
         1000.0*timers_avg[0],
         1000.0*timers_avg[1],
@@ -510,19 +510,19 @@ int main(int argc, char* argv[]) {
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  
+
   MPI_Reduce(trid_timing.elapsed_time[2], timers_avg, 5, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce(&elapsed_trid_z, &avg_total, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     for(int i=0; i<5; i++)
-        timers_avg[i] /= mpi_handle.procs;
+        timers_avg[i] /= app.procs;
     
-    avg_total /= mpi_handle.procs;
+    avg_total /= app.procs;
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  if(mpi_handle.rank == 0) {
+  if(app.rank == 0) {
     printf("Average time in trid-z segments[ms]: \n[total] \t[%s] \t[%s] \t[%s] \t[%s] \t[%s] \n",
             elapsed_name[0], elapsed_name[1], elapsed_name[2], elapsed_name[3], elapsed_name[4]);
     printf("%lf \t%lf \t%lf \t%lf \t%lf \t%lf\n",
@@ -535,7 +535,7 @@ int main(int argc, char* argv[]) {
   }
   
   MPI_Barrier(MPI_COMM_WORLD);
-  if(app.coords[0] == 0 && app.coords[1] == 0 && app.coords[2] == 0) {
+  if(app.rank == 0) {
     // Print execution times
     printf("Time per section: \n[total] \t[prepro] \t[trid_x] \t[trid_y] \t[trid_z]\n");
     printf("%e \t%e \t%e \t%e \t%e\n",

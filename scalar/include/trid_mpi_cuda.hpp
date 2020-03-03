@@ -41,6 +41,7 @@
 
 #include "trid_cuda.h"
 
+EXTERN_C
 struct trid_timer {
   double timer;
   double elapsed_time[3][5];
