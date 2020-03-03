@@ -190,16 +190,6 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     if(strcmp((char*)options[opt_index].name,"prof") == 0) prof = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"help") == 0) print_help();
   }
-
-  cudaSafeCall( cudaDeviceReset() );
-  cutilDeviceInit(argc, argv);
-  cudaSafeCall( cudaSetDevice(devid) );
-
-  #if FPPREC == 0
-    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
-  #elif FPPREC == 1
-    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  #endif
   
   app.size_g = (int *) calloc(3, sizeof(int));
   app.size = (int *) calloc(3, sizeof(int));
@@ -230,6 +220,19 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
 
   app.params = new MpiSolverParams(app.comm, 3, app.pdims);
   
+  MPI_Barrier(MPI_COMM_WORLD);
+  devid = app.rank % 4;
+  cudaSafeCall( cudaSetDevice(devid) );
+  cutilDeviceInit(argc, argv);
+  
+  #if FPPREC == 0
+    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
+  #elif FPPREC == 1
+    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+  #endif
+  
+  MPI_Barrier(MPI_COMM_WORLD);
+  
   for(int i = 0; i < 3; i++) {
     setStartEnd(&app.start_g[i], &app.end_g[i], app.coords[i], app.pdims[i], app.size_g[i]);
     app.size[i] = app.end_g[i] - app.start_g[i] + 1;
@@ -244,15 +247,6 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     printf("\nNumber of MPI procs in each dimenstion %d, %d, %d\n",
            mpi_handle.pdims[0], mpi_handle.pdims[1], mpi_handle.pdims[2]);
   }*/
-
-  /*printf("Check parameters: SIMD_WIDTH = %d, sizeof(FP) = %d\n", SIMD_WIDTH, sizeof(FP));
-  printf("Check parameters: nx_pad (padded) = %d\n", trid_handle.pads[0]);
-  printf("Check parameters: nx = %d, x_start_g = %d, x_end_g = %d \n", 
-         trid_handle.size[0], trid_handle.start_g[0], trid_handle.end_g[0]);
-  printf("Check parameters: ny = %d, y_start_g = %d, y_end_g = %d \n", 
-         trid_handle.size[1], trid_handle.start_g[1], trid_handle.end_g[1]);
-  printf("Check parameters: nz = %d, z_start_g = %d, z_end_g = %d \n",
-         trid_handle.size[2], trid_handle.start_g[2], trid_handle.end_g[2]);*/
   
   int size = app.size[0] * app.size[1] * app.size[2];
   
