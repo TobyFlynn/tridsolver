@@ -49,7 +49,8 @@
 #include <cmath>
 
 #define MAX_REDUCED_LEN 1024
-#define MIN_TRID_LEN 64
+#define MIN_TRID_LEN 8
+#define BLOCKING_FACTOR 32
 
 //
 // Thomas solver for reduced systems
@@ -190,7 +191,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
+    trid_strided_multidim_forward<REAL, BLOCKING_FACTOR><<<dimGrid_x, dimBlock_x>>>(
         a, b, c, d, aa, cc, dd, boundaries,
         solvedim, sys_n, d_dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
@@ -220,7 +221,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    trid_strided_multidim_backward<REAL, INC>
+    trid_strided_multidim_backward<REAL, BLOCKING_FACTOR, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u,
                                     boundaries, solvedim, sys_n, d_dims, trid_split_factor);
     cudaSafeCall( cudaPeekAtLastError() );
