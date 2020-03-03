@@ -64,11 +64,13 @@ inline double elapsed_time(double *et) {
   return *et - old_time;
 }
 
-inline void timing_start(double *timer) {
+inline void timing_start(double *timer, MPI_Comm comm) {
+  MPI_Barrier(comm);
   elapsed_time(timer);
 }
 
-inline void timing_end(double *timer, double *elapsed_accumulate) {
+inline void timing_end(double *timer, double *elapsed_accumulate, MPI_Comm comm) {
+  MPI_Barrier(comm);
   double elapsed = elapsed_time(timer);
   *elapsed_accumulate += elapsed;
 }
@@ -263,7 +265,7 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
                                REAL *u, int *u_pads, int ndim, int solvedim,
                                int *dims, int *dims_g, trid_timer &timer_handle) {
   
-  timing_start(&timer_handle.timer);
+  timing_start(&timer_handle.timer, params.communicators[solvedim]);
   
   // TODO paddings!!
   assert(solvedim < ndim);
@@ -334,7 +336,7 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
   dim3 dimGrid_x(dimgridx, dimgridy);
   dim3 dimBlock_x(blockdimx, blockdimy);
   
-  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][0]);
+  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][0], params.communicators[solvedim]);
   
   if (solvedim == 0) {
     trid_linear_forward<REAL>
@@ -350,7 +352,7 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
     cudaSafeCall( cudaDeviceSynchronize() );
   }
   
-  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][1]);
+  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][1], params.communicators[solvedim]);
   
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
@@ -364,14 +366,14 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
                 receive_buf.data(), comm_buf_size, real_datatype,
                 params.communicators[solvedim]);
   
-  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][2]);
+  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][2], params.communicators[solvedim]);
   
   // solve reduced systems, and store results directly in boundaries array on GPU
   thomas_on_reduced_batched<REAL>(receive_buf.data(), boundaries, sys_n, 
                                   params.num_mpi_procs[solvedim],
                                   params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
   
-  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][3]);
+  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][3], params.communicators[solvedim]);
 
   if (solvedim == 0) {
     trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
@@ -386,7 +388,7 @@ void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a
     cudaSafeCall( cudaDeviceSynchronize() );
   }
   
-  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][4]);
+  timing_end(&timer_handle.timer, &timer_handle.elapsed_time[solvedim][4], params.communicators[solvedim]);
 
   cudaSafeCall( cudaFree(aa) );
   cudaSafeCall( cudaFree(cc) );

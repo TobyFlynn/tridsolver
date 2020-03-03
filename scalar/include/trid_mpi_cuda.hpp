@@ -43,7 +43,7 @@
 
 struct trid_timer {
   double timer;
-  double elapsed_time_x[3][5];
+  double elapsed_time[3][5];
 };
 
 EXTERN_C
