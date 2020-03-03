@@ -78,28 +78,28 @@ EXTERN_C
 tridStatus_t tridDmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
                                       const double *c, double *d, double *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int ndim, int solvedim, int *dims,
                                       int *pads, trid_timer &timer_handle);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
                                       const float *c, float *d, float *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int ndim, int solvedim, int *dims,
                                       int *pads, trid_timer &timer_handle);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
                                       const double *c, double *d, double *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int ndim, int solvedim, int *dims,
                                       int *pads, trid_timer &timer_handle);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
                                       const float *c, float *d, float *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int ndim, int solvedim, int *dims,
                                       int *pads, trid_timer &timer_handle);
 
 EXTERN_C
