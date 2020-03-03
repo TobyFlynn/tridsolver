@@ -50,9 +50,9 @@
 
 #include <sys/time.h>
 
-#define MAX_REDUCED_LEN 1024
-#define MIN_TRID_LEN 8
-#define BLOCKING_FACTOR 32
+//#define MAX_REDUCED_LEN 1024
+//#define MIN_TRID_LEN 8
+//#define BLOCKING_FACTOR 32
 
 inline double elapsed_time(double *et) {
   struct timeval t;

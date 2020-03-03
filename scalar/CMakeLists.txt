@@ -67,6 +67,15 @@ endif (INTEL_CC)
 set(N_MAX 1024 CACHE STRING "Maximal length of the internal buffer for storing intermediate c and d vectors of the Thomas algorithm") 
 add_definitions(-DN_MAX=${N_MAX}) 
 
+set(MAX_R_LEN 1024)
+add_definitions(-DMAX_REDUCED_LEN=${MAX_R_LEN})
+
+set(MIN_T_LEN 32)
+add_definitions(-DMIN_TRID_LEN=${MIN_T_LEN})
+
+set(BLOCK_FACTOR 32)
+add_definitions(-DBLOCKING_FACTOR=${BLOCK_FACTOR})
+
 # Invoke subprojects
 add_subdirectory(src/cpu)
 add_subdirectory(src/cuda)
