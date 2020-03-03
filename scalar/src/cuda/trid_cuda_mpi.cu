@@ -49,7 +49,7 @@
 #include <cmath>
 
 #define MAX_REDUCED_LEN 1024
-#define MIN_TRID_LEN 8
+#define MIN_TRID_LEN 64
 
 //
 // Thomas solver for reduced systems
