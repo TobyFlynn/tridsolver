@@ -405,6 +405,14 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                        pads, u, pads, ndim, solvedim, dims, dims_g);
 }
 
+template <typename REAL, int INC>
+void tridMultiDimBatchSolveTimedMPI(const MpiSolverParams &params, const REAL *a,
+                               const REAL *b, const REAL *c, REAL *d, REAL *u,
+                               int ndim, int solvedim, int *dims, int *dims_g, int *pads, trid_timer &timer_handle) {
+  tridMultiDimBatchSolveTimedMPI<REAL, INC>(params, a, pads, b, pads, c, pads, d,
+                                       pads, u, pads, ndim, solvedim, dims, dims_g, timer_handle);
+}
+
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
@@ -455,7 +463,7 @@ tridStatus_t tridDmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
                                       const double *c, double *d, double *u,
                                       int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads, trid_timer &timer_handle) {
-  tridMultiDimBatchSolveMPI<double, 0>(params, a, b, c, d, u, ndim, solvedim,
+  tridMultiDimBatchSolveTimedMPI<double, 0>(params, a, b, c, d, u, ndim, solvedim,
                                        dims, dims_g, pads, timer_handle);
   return TRID_STATUS_SUCCESS;
 }
@@ -466,7 +474,7 @@ tridStatus_t tridSmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
                                       const float *c, float *d, float *u,
                                       int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads, trid_timer &timer_handle) {
-  tridMultiDimBatchSolveMPI<float, 0>(params, a, b, c, d, u, ndim, solvedim,
+  tridMultiDimBatchSolveTimedMPI<float, 0>(params, a, b, c, d, u, ndim, solvedim,
                                       dims, dims_g, pads, timer_handle);
   return TRID_STATUS_SUCCESS;
 }
@@ -477,7 +485,7 @@ tridStatus_t tridDmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
                                       const double *c, double *d, double *u,
                                       int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads, trid_timer &timer_handle) {
-  tridMultiDimBatchSolveMPI<double, 1>(params, a, b, c, d, u, ndim, solvedim,
+  tridMultiDimBatchSolveTimedMPI<double, 1>(params, a, b, c, d, u, ndim, solvedim,
                                        dims, dims_g, pads, timer_handle);
   return TRID_STATUS_SUCCESS;
 }
@@ -488,7 +496,7 @@ tridStatus_t tridSmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
                                       const float *c, float *d, float *u,
                                       int ndim, int solvedim, int *dims, int *dims_g,
                                       int *pads, trid_timer &timer_handle) {
-  tridMultiDimBatchSolveMPI<float, 1>(params, a, b, c, d, u, ndim, solvedim,
+  tridMultiDimBatchSolveTimedMPI<float, 1>(params, a, b, c, d, u, ndim, solvedim,
                                       dims, dims_g, pads, timer_handle);
   return TRID_STATUS_SUCCESS;
 }
