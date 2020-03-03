@@ -41,6 +41,11 @@
 
 #include "trid_cuda.h"
 
+struct trid_timer {
+  double timer;
+  double elapsed_time[3][5];
+};
+
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
@@ -68,6 +73,34 @@ tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const float *c, float *d, float *u,
                                          int ndim, int solvedim, int *dims,
                                          int *pads);
+
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
+                                      const double *a, const double *b,
+                                      const double *c, double *d, double *u,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int *pads, trid_timer &timer_handle);
+
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchTimedMPI(const MpiSolverParams &params,
+                                      const float *a, const float *b,
+                                      const float *c, float *d, float *u,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int *pads, trid_timer &timer_handle);
+
+EXTERN_C
+tridStatus_t tridDmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
+                                      const double *a, const double *b,
+                                      const double *c, double *d, double *u,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int *pads, trid_timer &timer_handle);
+
+EXTERN_C
+tridStatus_t tridSmtsvStridedBatchIncTimedMPI(const MpiSolverParams &params,
+                                      const float *a, const float *b,
+                                      const float *c, float *d, float *u,
+                                      int ndim, int solvedim, int *dims, int *dims_g,
+                                      int *pads, trid_timer &timer_handle);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchPaddedMPI(

@@ -18,6 +18,8 @@ struct app_handle {
   
   int *pdims;
   int *coords;
+  int rank;
+  int procs;
   
   MPI_Comm comm;
   MpiSolverParams *params;
