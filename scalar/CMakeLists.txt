@@ -67,14 +67,11 @@ endif (INTEL_CC)
 set(N_MAX 1024 CACHE STRING "Maximal length of the internal buffer for storing intermediate c and d vectors of the Thomas algorithm") 
 add_definitions(-DN_MAX=${N_MAX}) 
 
-set(MAX_REDUCED_LEN 1024 CACHE STRING "User-specified option")
-add_definitions(-DMAX_REDUCED_LEN=${MAX_REDUCED_LEN})
-
-set(MIN_TRID_LEN 32 CACHE STRING "User-specified option")
-add_definitions(-DMIN_TRID_LEN=${MIN_TRID_LEN})
-
 set(BLOCKING_FACTOR 32 CACHE STRING "User-specified option")
 add_definitions(-DBLOCKING_FACTOR=${BLOCKING_FACTOR})
+
+set(SPLIT_FACTOR 1 CACHE STRING "User-specified option")
+add_definitions(-DSPLIT_FACTOR=${SPLIT_FACTOR})
 
 # Invoke subprojects
 add_subdirectory(src/cpu)
