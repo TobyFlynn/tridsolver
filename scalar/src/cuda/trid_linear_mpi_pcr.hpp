@@ -45,7 +45,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
                     const REAL *__restrict__ c, const REAL *__restrict__ d,
                     REAL *__restrict__ aa, REAL *__restrict__ cc,
                     REAL *__restrict__ dd, REAL *__restrict__ boundaries,
-                    int sys_size, int sys_pads, int sys_n, int split_factor) {
+                    int sys_size, int sys_pads, int sys_n) {
 
   REAL bb;
   int i;
@@ -54,14 +54,14 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
             blockIdx.x * blockDim.y * blockDim.x +
             blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
-  int totalTrids = sys_n * split_factor;
-  int offset = (tid % split_factor) * (sys_size / split_factor);
-  int ind = sys_pads * (tid / split_factor) + offset;
+  int totalTrids = sys_n * SPLIT_FACTOR;
+  int offset = (tid % SPLIT_FACTOR) * (sys_size / SPLIT_FACTOR);
+  int ind = sys_pads * (tid / SPLIT_FACTOR) + offset;
   int len;
-  if(tid % split_factor == split_factor - 1) {
+  if(tid % SPLIT_FACTOR == SPLIT_FACTOR - 1) {
     len = sys_size - offset;
   } else {
-    len = sys_size / split_factor;
+    len = sys_size / SPLIT_FACTOR;
   }
 
   if (tid < totalTrids) {
@@ -117,20 +117,20 @@ __global__ void
 trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                      const REAL *__restrict__ dd, REAL *__restrict__ d,
                      REAL *__restrict__ u, const REAL *__restrict__ boundaries,
-                     int sys_size, int sys_pads, int sys_n, int split_factor) {
+                     int sys_size, int sys_pads, int sys_n) {
   // Thread ID in global scope - every thread solves one system
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
             blockIdx.x * blockDim.y * blockDim.x +
             blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
-  int totalTrids = sys_n * split_factor;
-  int offset = (tid % split_factor) * (sys_size / split_factor);
-  int ind = sys_pads * (tid / split_factor) + offset;
+  int totalTrids = sys_n * SPLIT_FACTOR;
+  int offset = (tid % SPLIT_FACTOR) * (sys_size / SPLIT_FACTOR);
+  int ind = sys_pads * (tid / SPLIT_FACTOR) + offset;
   int len;
   
-  if(tid % split_factor == split_factor - 1) {
+  if(tid % SPLIT_FACTOR == SPLIT_FACTOR - 1) {
     len = sys_size - offset;
   } else {
-    len = sys_size / split_factor;
+    len = sys_size / SPLIT_FACTOR;
   }
 
   if (tid < totalTrids) {
