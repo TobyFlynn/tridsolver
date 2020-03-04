@@ -35,8 +35,7 @@
 
 template<typename REAL>
 __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, REAL *results, 
-                                      const int split_factor, const int mpi_coord, 
-                                      const int n, const int P) {
+                                      const int mpi_coord, const int n, const int P) {
   int tridNum = blockIdx.x;
   int i = threadIdx.x;
   int ind = tridNum * n + i;
@@ -89,9 +88,9 @@ __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, REAL *results,
     s = s << 1;
   }
   
-  if(i >= 2 * split_factor * mpi_coord && i < 2 * split_factor * (mpi_coord + 1)) {
-    int reduced_ind_l = i - (2 * split_factor * mpi_coord);
-    results[split_factor * 2 * tridNum + reduced_ind_l] = d[ind];
+  if(i >= 2 * SPLIT_FACTOR * mpi_coord && i < 2 * SPLIT_FACTOR * (mpi_coord + 1)) {
+    int reduced_ind_l = i - (2 * SPLIT_FACTOR * mpi_coord);
+    results[SPLIT_FACTOR * 2 * tridNum + reduced_ind_l] = d[ind];
   }
 }
 
