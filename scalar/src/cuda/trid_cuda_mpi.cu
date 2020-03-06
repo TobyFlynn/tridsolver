@@ -50,6 +50,10 @@
 
 #include <sys/time.h>
 
+#include <cusparse_v2.h>
+#include <cublas_v2.h>
+#include <cuda_runtime_api.h>
+
 //#define MAX_REDUCED_LEN 1024
 //#define MIN_TRID_LEN 8
 //#define BLOCKING_FACTOR 32
@@ -73,6 +77,22 @@ inline void timing_end(double *timer, double *elapsed_accumulate, MPI_Comm comm)
   MPI_Barrier(comm);
   double elapsed = elapsed_time(timer);
   *elapsed_accumulate += elapsed;
+}
+
+template<typename REAL>
+void transpose(cublasHandle_t &handle, size_t mRows, size_t nCols, const REAL *in, REAL *out) {
+}
+template<>
+void transpose<float>(cublasHandle_t &handle, size_t mRows, size_t nCols, const float *in, float *out) {
+   float alpha = 1.;
+   float beta = 0.;
+   cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, mRows, nCols, &alpha, in, nCols, &beta, in, nCols, out, mRows);
+}
+template<>
+void transpose<double>(cublasHandle_t &handle, size_t mRows, size_t nCols, const double *in, double *out) {
+   double alpha = 1.;
+   double beta = 0.;
+   cublasDgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T, mRows, nCols, &alpha, in, nCols, &beta, in, nCols, out, mRows);
 }
 
 //
@@ -184,6 +204,45 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       }
     }
   }*/
+  
+  if(solvedim == 0) {
+    REAL *aT = NULL;
+    REAL *bT = NULL;
+    REAL *cT = NULL;
+    REAL *dT = NULL;
+    REAL *uT = NULL;
+    
+    int size_needed = sizeof(REAL) * sys_n * local_eq_size;
+    
+    cudaSafeCall( cudaMalloc(&aT, size_needed) );
+    cudaSafeCall( cudaMalloc(&bT, size_needed) );
+    cudaSafeCall( cudaMalloc(&cT, size_needed) );
+    cudaSafeCall( cudaMalloc(&dT, size_needed) );
+    cudaSafeCall( cudaMalloc(&uT, size_needed) );
+    
+    size_t m = sys_n_lin;  /* Maybe need to swap? */
+    size_t n = sys_pads;
+    cudaSafeCall( cudaDeviceSetCacheConfig(cudaFuncCachePreferShared) );
+    transpose(handle, m, n, a, aT);
+    transpose(handle, m, n, b, bT);
+    transpose(handle, m, n, c, cT);
+    transpose(handle, m, n, d, dT);
+    if(INC) transpose(handle, m, n, u, uT);
+    cudaSafeCall( cudaDeviceSetCacheConfig(cudaFuncCachePreferL1) );
+    
+    int newDims[3] = {sys_n, local_eq_size, 1};
+    
+    tridMultiDimBatchSolveMPI<REAL, INC>(params, aT, newDims, bT, newDims, cT, newDims, dT, 
+                                         newDims, uT, newDims, 3, 1, newDims, 
+                                         newDims/*TODO remove global dims*/);
+    
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferShared);
+    if ( INC ) transpose(handle, n, m, uT, u);
+    else transpose(handle, n, m, dT, d);
+    cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+    
+    return;
+  }
   
   int reduced_len_g = SPLIT_FACTOR * 2 * params.num_mpi_procs[solvedim];
   
