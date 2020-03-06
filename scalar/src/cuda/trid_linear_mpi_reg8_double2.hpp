@@ -42,14 +42,14 @@
 
 #include "cuda_shfl.h"
 
-template<typedef REAL>
-typedef union {
+template<typename REAL>
+union double8 {
   double2 vec[VEC/2];
   REAL  f[VEC];
-} double8;
+};
 
 // transpose4x4xor() - exchanges data between 4 consecutive threads
-template<typedef REAL>
+template<typename REAL>
 inline __device__ void transpose4x4xor(double8<REAL>* la) {
   double2 tmp1;
   double2 tmp2;
@@ -113,7 +113,7 @@ inline __device__ void transpose4x4xor(double8<REAL>* la) {
 
 // ga - global array
 // la - local array
-template<typedef REAL>
+template<typename REAL>
 inline __device__ void load_array_reg8_double2(const REAL* __restrict__ ga, double8<REAL>* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
@@ -137,7 +137,7 @@ inline __device__ void load_array_reg8_double2(const REAL* __restrict__ ga, doub
 // Same as load_array_reg8() with the following exception: if sys_pads would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
 // ga - global array
 // la - local array
-template<typedef REAL>
+template<typename REAL>
 inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict__ ga, double8<REAL>* la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
