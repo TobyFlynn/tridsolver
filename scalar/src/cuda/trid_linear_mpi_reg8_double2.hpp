@@ -377,9 +377,9 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
         
-        boundaries[b_ind] = l_aa.f[VEC - 1];
-        boundaries[b_ind + 2] = l_cc.f[VEC - 1];
-        boundaries[b_ind + 4] = l_dd.f[VEC - 1];
+        boundaries[b_ind] = l_aa.f[0];
+        boundaries[b_ind + 2] = l_cc.f[0];
+        boundaries[b_ind + 4] = l_dd.f[0];
     } else {
       //
       // forward pass
@@ -451,7 +451,6 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
   //const int aligned         = !(sys_pads % ALIGN_DOUBLE);
   
   int n = 0;
-  int b_ind = tid * 6;
   int ind = sys_pads * tid;
   
   double8<REAL> l_aa, l_cc, l_dd, l_d, l_u;

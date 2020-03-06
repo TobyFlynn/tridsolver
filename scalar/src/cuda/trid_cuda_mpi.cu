@@ -229,7 +229,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
 
-  int trid_split_factor = reduced_len_l / 2;
+  //int trid_split_factor = reduced_len_l / 2;
   int total_trids;
   /*if(solvedim == 0) {
     total_trids = sys_n * trid_split_factor;
@@ -248,7 +248,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   dim3 dimGrid_x(dimgridx, dimgridy);
   dim3 dimBlock_x(blockdimx, blockdimy);
   if (solvedim == 0) {
-    trid_linear_forward_old<REAL>
+    trid_linear_forward<REAL>
         <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
                                     local_eq_size, local_eq_size, sys_n);
     cudaSafeCall( cudaPeekAtLastError() );
