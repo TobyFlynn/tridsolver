@@ -164,6 +164,66 @@ inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict_
 
 }
 
+// Store a tile with 32x16 elements into 32 double8 struct allocated in registers. Every 4 consecutive threads cooperate to transpose and store a 4 x double2 sub-tile.
+// ga - global array
+// la - local array
+inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
+  int gind; // Global memory index of an element
+  // Array indexing can be decided in compile time -> arrays will stay in registers
+  // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
+  int trow = (threadIdx.x % 32) / 4; // Threads' row index within a warp
+  int tcol =  threadIdx.x     % 4;   // Threads' colum index within a warp
+
+  transpose4x4xor(la);
+
+  gind = woffset + (4*(trow)) * sys_pads + tcol*2 + n;
+  *((double2*)&ga[gind]) = (*la).vec[0];
+  gind += sys_pads;
+  *((double2*)&ga[gind]) = (*la).vec[1];
+  gind += sys_pads;
+  *((double2*)&ga[gind]) = (*la).vec[2];
+  gind += sys_pads;
+  *((double2*)&ga[gind]) = (*la).vec[3];
+
+  //int i;
+  //#pragma unroll(4)
+  //for(i=0; i<lines; i++) {
+  //  //if(gind+4<stride*ny*nz) *((double2*)&ga[gind]) = (*la).vec[i];
+  //  *((double2*)&ga[gind]) = (*la).vec[i];
+  //  gind += stride;
+  //}
+
+}
+
+// Same as store_array_reg8() with the following exception: if stride would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
+// ga - global array
+// la - local array
+inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
+  int gind; // Global memory index of an element
+  // Array indexing can be decided in compile time -> arrays will stay in registers
+  // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
+  //int trow = (threadIdx.x % 32)/ 4; // Threads' row index within a warp
+  int tcol = threadIdx.x % 4;       // Threads' colum index within a warp
+
+  transpose4x4xor(la);
+
+  // Store 4 double2 values (64bytes) to an X-line
+  //gind = (tid/4)*4 * sys_pads  + tcol*4 + n; // Global memory index for threads
+  gind = (tid/4)*4 * sys_pads  + n; // Global memory index for threads
+
+  int gind_floor;
+  //int ind;
+  int i;
+  for(i=0; i<4; i++) {
+    //gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE ; // Round index to floor
+    gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    //gind_floor = (gind/4)*4; // Round index to floor double2
+    *((double2*)&ga[gind_floor]) = (*la).vec[i];  // Put aligned data
+    //*((double2*)&ga[gind_floor]) = (double2){gind_floor, gind_floor,gind_floor, gind_floor};  // Put aligned data
+    gind += sys_pads;                              // Stride to the next system
+  }
+}
+
 // TODO eliminate extra loads and stores
 template <typename REAL>
 __global__ void
