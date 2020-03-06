@@ -169,7 +169,7 @@ inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict_
 // ga - global array
 // la - local array
 template<typename REAL>
-inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8<REAL>* la, int n, int woffset, int sys_pads) {
+inline __device__ void store_array_reg8_double2(REAL* __restrict__ ga, double8<REAL>* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -201,7 +201,7 @@ inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8
 // ga - global array
 // la - local array
 template<typename REAL>
-inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8<REAL>* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
+inline __device__ void store_array_reg8_double2_unaligned(REAL* __restrict__ ga, double8<REAL>* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -455,7 +455,6 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
   int ind = sys_pads * tid;
   
   double8<REAL> l_aa, l_cc, l_dd, l_d, l_u;
-  REAL bb, a2, c2, d2;
   
   if(active_thread) {
     REAL dd0 = boundaries[2 * tid];
