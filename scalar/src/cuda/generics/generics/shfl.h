@@ -2,7 +2,7 @@
 #include <generics/detail/alias.h>
 #include <thrust/detail/static_assert.h>
 
-//#include "cuda_shfl.h"
+#include "cuda_shfl.h"
 
 
 namespace detail {
