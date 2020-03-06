@@ -193,7 +193,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   
   int reduced_len_g;
   int reduced_len_l;
-  if(solvedim == 0) {
+  /*if(solvedim == 0) {
     // Calculate the minimum length of reduced systems possible
     const int min_reduced_len_g = 2 * params.num_mpi_procs[solvedim];
     // Set the reduced system length to this minimum
@@ -216,7 +216,10 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   } else {
     reduced_len_g = 2 * params.num_mpi_procs[solvedim];
     reduced_len_l = 2;
-  }
+  }*/
+  
+  reduced_len_g = 2 * params.num_mpi_procs[solvedim];
+  reduced_len_l = 2;
 
   const int local_helper_size = outer_size * eq_stride * local_eq_size;
   REAL *aa, *cc, *dd, *boundaries;
@@ -227,11 +230,13 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   int trid_split_factor = reduced_len_l / 2;
   int total_trids;
-  if(solvedim == 0) {
+  /*if(solvedim == 0) {
     total_trids = sys_n * trid_split_factor;
   } else {
     total_trids = sys_n;
-  }
+  }*/
+  
+  total_trids = sys_n;
   
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
@@ -244,7 +249,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   if (solvedim == 0) {
     trid_linear_forward<REAL>
         <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
-                                    local_eq_size, local_eq_size, sys_n, trid_split_factor);
+                                    local_eq_size, local_eq_size, sys_n);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
@@ -267,19 +272,19 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                 params.communicators[solvedim]);
   
   // solve reduced systems, and store results directly in boundaries array on GPU
-  if(solvedim == 0) {
+  /*if(solvedim == 0) {
     thomas_on_reduced_batched_split<REAL>(receive_buf.data(), boundaries, sys_n, 
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
-  } else {
+  } else {*/
     thomas_on_reduced_batched<REAL>(receive_buf.data(), boundaries, sys_n, 
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g);
-  }
+  //}
 
   if (solvedim == 0) {
     trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
-        aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n, trid_split_factor);
+        aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
