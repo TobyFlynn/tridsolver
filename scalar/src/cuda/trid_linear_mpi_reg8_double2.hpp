@@ -161,21 +161,22 @@ inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict_
     gind        += sys_pads;                         // Stride to the next system
   }
 
-  transpose4x4xor(la);
+  transpose4x4xor<REAL>(la);
 
 }
 
 // Store a tile with 32x16 elements into 32 double8 struct allocated in registers. Every 4 consecutive threads cooperate to transpose and store a 4 x double2 sub-tile.
 // ga - global array
 // la - local array
-inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
+template<typename REAL>
+inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8<REAL>* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
   int trow = (threadIdx.x % 32) / 4; // Threads' row index within a warp
   int tcol =  threadIdx.x     % 4;   // Threads' colum index within a warp
 
-  transpose4x4xor(la);
+  transpose4x4xor<REAL>(la);
 
   gind = woffset + (4*(trow)) * sys_pads + tcol*2 + n;
   *((double2*)&ga[gind]) = (*la).vec[0];
@@ -199,14 +200,15 @@ inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8
 // Same as store_array_reg8() with the following exception: if stride would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
 // ga - global array
 // la - local array
-inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
+template<typename REAL>
+inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8<REAL>* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
   //int trow = (threadIdx.x % 32)/ 4; // Threads' row index within a warp
   int tcol = threadIdx.x % 4;       // Threads' colum index within a warp
 
-  transpose4x4xor(la);
+  transpose4x4xor<REAL>(la);
 
   // Store 4 double2 values (64bytes) to an X-line
   //gind = (tid/4)*4 * sys_pads  + tcol*4 + n; // Global memory index for threads
