@@ -35,6 +35,67 @@
 
 template<typename REAL>
 __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, REAL *results, 
+                                      const int mpi_coord, const int n, const int P) {
+  int tridNum = blockIdx.x;
+  int i = threadIdx.x;
+  int ind = tridNum * n + i;
+
+  if(i >= n) {
+
+    for(int p = 0; p < P; p++) {
+      __syncthreads();
+      __syncthreads();
+    }
+    
+    return;
+  }
+  
+  REAL a_m, a_p, c_m, c_p, d_m, d_p;
+
+  int s = 1;
+  
+  for(int p = 0; p < P; p++) {
+    if(i - s < 0) {
+      a_m = (REAL) 0.0;
+      c_m = (REAL) 0.0;
+      d_m = (REAL) 0.0;
+    } else {
+      a_m = a[ind - s];
+      c_m = c[ind - s];
+      d_m = d[ind - s];
+    }
+    
+    if(i + s >= n) {
+      a_p = (REAL) 0.0;
+      c_p = (REAL) 0.0;
+      d_p = (REAL) 0.0;
+    } else {
+      a_p = a[ind + s];
+      c_p = c[ind + s];
+      d_p = d[ind + s];
+    }
+    
+    __syncthreads();
+    
+    REAL r = 1.0 - a[ind] * c_m - c[ind] * a_p;
+    r = 1.0 / r;
+    d[ind] = r * (d[ind] - a[ind] * d_m - c[ind] * d_p);
+    a[ind] = -r * a[ind] * a_m;
+    c[ind] = -r * c[ind] * c_p;
+    
+    __syncthreads();
+    
+    s = s << 1;
+  }
+  
+  if(i >= 2 * mpi_coord && i < 2 * (mpi_coord + 1)) {
+    int reduced_ind_l = i - (2 * mpi_coord);
+    results[2 * tridNum + reduced_ind_l] = d[ind];
+  }
+}
+
+template<typename REAL>
+__global__ void pcr_on_reduced_kernel_split(REAL *a, REAL *c, REAL *d, REAL *results, 
                                       const int split_factor, const int mpi_coord, 
                                       const int n, const int P) {
   int tridNum = blockIdx.x;
