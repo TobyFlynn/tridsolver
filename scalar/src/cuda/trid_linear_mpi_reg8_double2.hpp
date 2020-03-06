@@ -342,7 +342,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
           for(int i = VEC - 1; i >= 0; i--) {
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
-            a2 = l_aa.f[i] = l_cc.f[i] * a2;
+            a2 = l_aa.f[i] - l_cc.f[i] * a2;
             c2 = -l_cc.f[i] * c2;
             l_dd.f[i] = d2;
             l_aa.f[i] = a2;
@@ -380,6 +380,12 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         boundaries[b_ind] = l_aa.f[0];
         boundaries[b_ind + 2] = l_cc.f[0];
         boundaries[b_ind + 4] = l_dd.f[0];
+        /*boundaries[b_ind + 0] = aa[ind];
+        boundaries[b_ind + 1] = aa[ind + sys_size - 1];
+        boundaries[b_ind + 2] = cc[ind];
+        boundaries[b_ind + 3] = cc[ind + sys_size - 1];
+        boundaries[b_ind + 4] = dd[ind];
+        boundaries[b_ind + 5] = dd[ind + sys_size - 1];*/
     } else {
       //
       // forward pass
