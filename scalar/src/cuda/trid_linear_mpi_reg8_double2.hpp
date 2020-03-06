@@ -473,7 +473,7 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
         u[ind] += dd0;
         
         for(int i = 1; i < sys_size - 1; i++) {
-          u[ind + 1] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * dd_last;
+          u[ind + 1] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
         }
         
         u[ind + sys_size - 1] += ddn;
@@ -481,7 +481,7 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
         d[ind] = dd0;
         
         for(int i = 1; i < sys_size - 1; i++) {
-          d[ind + 1] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * dd_last;
+          d[ind + 1] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
         }
         
         d[ind + sys_size - 1] = ddn;
