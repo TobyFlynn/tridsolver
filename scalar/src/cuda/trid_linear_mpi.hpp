@@ -45,7 +45,7 @@
  */
 template <typename REAL>
 __global__ void
-trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
+trid_linear_forward_old(const REAL *__restrict__ a, const REAL *__restrict__ b,
                     const REAL *__restrict__ c, const REAL *__restrict__ d,
                     REAL *__restrict__ aa, REAL *__restrict__ cc,
                     REAL *__restrict__ dd, REAL *__restrict__ boundaries,
@@ -110,7 +110,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
 //
 template <typename REAL, int INC>
 __global__ void
-trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
+trid_linear_backward_old(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                      const REAL *__restrict__ dd, REAL *__restrict__ d,
                      REAL *__restrict__ u, const REAL *__restrict__ boundaries,
                      int sys_size, int sys_pads, int sys_n) {

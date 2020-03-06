@@ -37,6 +37,7 @@
 #include "trid_mpi_cuda.hpp"
 
 #include "trid_linear_mpi_reg8_double2.hpp"
+#include "trid_linear_mpi.hpp"
 #include "trid_strided_multidim_mpi_pcr.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
@@ -247,7 +248,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   dim3 dimGrid_x(dimgridx, dimgridy);
   dim3 dimBlock_x(blockdimx, blockdimy);
   if (solvedim == 0) {
-    trid_linear_forward<REAL>
+    trid_linear_forward_old<REAL>
         <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
                                     local_eq_size, local_eq_size, sys_n);
     cudaSafeCall( cudaPeekAtLastError() );
