@@ -48,9 +48,9 @@
 #include <type_traits>
 #include <cmath>
 
-#define MAX_REDUCED_LEN 1024
-#define MIN_TRID_LEN 8
-#define BLOCKING_FACTOR 32
+//#define MAX_REDUCED_LEN 1024
+//#define MIN_TRID_LEN 8
+//#define BLOCKING_FACTOR 32
 
 //
 // Thomas solver for reduced systems
