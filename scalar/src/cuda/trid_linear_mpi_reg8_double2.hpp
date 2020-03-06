@@ -41,6 +41,7 @@
 #include <generics/generics/shfl.h>
 
 #include "cuda_shfl.h"
+#include "trid_common.h"
 
 template<typename REAL>
 union double8 {
