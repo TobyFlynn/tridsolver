@@ -213,9 +213,9 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       
       for(int i = 2; i < VEC; i++) {
         bb = static_cast<REAL>(1.0) / (l_b.f[i] - a_l.f[i] * c2);
-        d2 = (d_l.f[i] - a_l.f[i] * d2) * bb;
-        a2 = (-a_l.f[i] * a2) * bb;
-        c2 = c_l.f[i] * bb;
+        d2 = (l_d.f[i] - a_l.f[i] * d2) * bb;
+        a2 = (-l_a.f[i] * a2) * bb;
+        c2 = l_c.f[i] * bb;
         l_dd.f[i] = d2;
         l_aa.f[i] = a2;
         l_cc.f[i] = c2;
@@ -232,11 +232,11 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
           load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
-          for(i=0; i<VEC; i++) {
+          for(int i=0; i<VEC; i++) {
             bb = static_cast<REAL>(1.0) / (l_b.f[i] - a_l.f[i] * c2);
-            d2 = (d_l.f[i] - a_l.f[i] * d2) * bb;
-            a2 = (-a_l.f[i] * a2) * bb;
-            c2 = c_l.f[i] * bb;
+            d2 = (l_d.f[i] - a_l.f[i] * d2) * bb;
+            a2 = (-l_a.f[i] * a2) * bb;
+            c2 = l_c.f[i] * bb;
             l_dd.f[i] = d2;
             l_aa.f[i] = a2;
             l_cc.f[i] = c2;
@@ -324,9 +324,9 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         cc[ind + i] = bb * c[ind + i];
       }
 
-      if (len >= 3) {
+      if (sys_size >= 3) {
         // eliminate lower off-diagonal
-        for (int i = 2; i < len; i++) {
+        for (int i = 2; i < sys_size; i++) {
           int loc_ind = ind + i;
           bb = static_cast<REAL>(1.0) /
               (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
@@ -335,7 +335,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           cc[loc_ind] = c[loc_ind] * bb;
         }
         // Eliminate upper off-diagonal
-        for (int i = len - 3; i > 0; --i) {
+        for (int i = sys_size - 3; i > 0; --i) {
           int loc_ind = ind + i;
           dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
           aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
@@ -350,11 +350,11 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       // prepare boundaries for communication
       int i = tid * 6;
       boundaries[i + 0] = aa[ind];
-      boundaries[i + 1] = aa[ind + len - 1];
+      boundaries[i + 1] = aa[ind + sys_size - 1];
       boundaries[i + 2] = cc[ind];
-      boundaries[i + 3] = cc[ind + len - 1];
+      boundaries[i + 3] = cc[ind + sys_size - 1];
       boundaries[i + 4] = dd[ind];
-      boundaries[i + 5] = dd[ind + len - 1];
+      boundaries[i + 5] = dd[ind + sys_size - 1];
     }
   }
 }
