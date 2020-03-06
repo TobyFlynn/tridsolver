@@ -165,7 +165,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       "trid_solve_mpi: only double or float values are supported"));
 
   // The size of the equations / our domain
-  const size_t local_eq_size = dims[solvedim];
+  const int local_eq_size = dims[solvedim];
   assert(local_eq_size > 2 &&
          "One of the processes has fewer than 2 equations, this is not "
          "supported\n");
@@ -219,9 +219,13 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaMalloc(&cT, size_needed) );
     cudaSafeCall( cudaMalloc(&dT, size_needed) );
     cudaSafeCall( cudaMalloc(&uT, size_needed) );
-    
-    size_t m = sys_n_lin;  /* Maybe need to swap? */
-    size_t n = sys_pads;
+   
+    static cublasHandle_t handle = 0;
+
+    if ( !handle ) cublasCreate(&handle);
+ 
+    size_t m = sys_n;  /* Maybe need to swap? */
+    size_t n = local_eq_size;
     cudaSafeCall( cudaDeviceSetCacheConfig(cudaFuncCachePreferShared) );
     transpose(handle, m, n, a, aT);
     transpose(handle, m, n, b, bT);
@@ -240,7 +244,13 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     if ( INC ) transpose(handle, n, m, uT, u);
     else transpose(handle, n, m, dT, d);
     cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
-    
+   
+    cudaSafeCall( cudaFree(aT) );
+    cudaSafeCall( cudaFree(bT) );
+    cudaSafeCall( cudaFree(cT) );
+    cudaSafeCall( cudaFree(dT) );
+    cudaSafeCall( cudaFree(uT) );
+ 
     return;
   }
   

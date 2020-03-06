@@ -39,7 +39,7 @@
 #include <sys/time.h>
 
 #define FP double
-#define TIMED
+//#define TIMED
 
 #include "trid_mpi_cuda.hpp"
 #include "trid_mpi_solver_params.hpp"
@@ -450,7 +450,7 @@ int main(int argc, char* argv[]) {
 
   free(h_u);
   free(du);
-  
+#ifdef TIMED 
   double avg_total = 0.0;
 
   MPI_Reduce(trid_timing.elapsed_time[0], timers_avg, 5, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -533,7 +533,7 @@ int main(int argc, char* argv[]) {
         1000.0*timers_avg[3],
         1000.0*timers_avg[4]);
   }
-  
+#endif  
   MPI_Barrier(MPI_COMM_WORLD);
   if(app.rank == 0) {
     // Print execution times
