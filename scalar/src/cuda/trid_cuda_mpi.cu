@@ -37,7 +37,7 @@
 #include "trid_mpi_cuda.hpp"
 
 #include "trid_linear_mpi_pcr.hpp"
-#include "trid_strided_multidim_mpi.hpp"
+#include "trid_strided_multidim_mpi_pcr.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
 #include "cutil_inline.h"
@@ -248,14 +248,8 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    DIM_V pads, dims; // TODO
-    for (int i = 0; i < ndim; ++i) {
-      pads.v[i] = a_pads[i];
-      dims.v[i] = a_pads[i];
-    }
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
-        a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
-        ndim, solvedim, sys_n, dims);
+        a, b, c, d, aa, cc, dd, boundaries, solvedim, sys_n, dims);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
@@ -289,14 +283,8 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   } else {
-    DIM_V pads, dims; // TODO
-    for (int i = 0; i < ndim; ++i) {
-      pads.v[i] = a_pads[i];
-      dims.v[i] = a_pads[i];
-    }
     trid_strided_multidim_backward<REAL, INC>
-        <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
-                                    boundaries, ndim, solvedim, sys_n, dims);
+        <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u, boundaries, solvedim, sys_n, dims);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }

@@ -99,12 +99,12 @@ __device__ void trid_strided_multidim_forward_kernel(
   boundaries[ind_bound + 5] = dd[ind + (sys_size - 1) * stride];
 }
 
-template <typename REAL, int BLOCKING_FACTOR>
+template <typename REAL>
 __global__ void trid_strided_multidim_forward(
     const REAL *__restrict__ a, const REAL *__restrict__ b,
     const REAL *__restrict__ c, const REAL *__restrict__ d, REAL *__restrict__ aa,
     REAL *__restrict__ cc, REAL *__restrict__ dd, REAL *__restrict__ boundaries,
-    int solvedim, int sys_n, const int *dims, int split_factor) {
+    int solvedim, int sys_n, const int *dims) {
   //
   // set up indices for main block
   //
@@ -112,10 +112,8 @@ __global__ void trid_strided_multidim_forward(
   int tid = threadIdx.x + threadIdx.y * blockDim.x +
         blockIdx.x * blockDim.y * blockDim.x +
         blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
-  //int tridNum = tid % sys_n;
-  //int subTridNum = tid / sys_n;
-  int tridNum = (tid % BLOCKING_FACTOR) + (tid / (BLOCKING_FACTOR * split_factor)) * BLOCKING_FACTOR;
-  int subTridNum = (tid % (BLOCKING_FACTOR * split_factor)) / BLOCKING_FACTOR;
+
+  int tridNum = tid;
 
   int ind;
   int stride;
@@ -128,24 +126,12 @@ __global__ void trid_strided_multidim_forward(
     stride = dims[0] * dims[1];
   }
   
-  int ind_bound = (tridNum * split_factor + subTridNum) * 6;
+  int ind_bound = tridNum * 6;
   int sys_size = dims[solvedim];
-  
-  int totalTrids = sys_n * split_factor;
-  int offset = subTridNum * (sys_size / split_factor);
-  int len;
-  
-  if(subTridNum == split_factor - 1) {
-    len = sys_size - offset;
-  } else {
-    len = sys_size / split_factor;
-  }
-  
-  ind += offset * stride;
 
-  if (tid < totalTrids) {
+  if (tid < sys_n) {
     trid_strided_multidim_forward_kernel<REAL>(
-        a, b, c, d, aa, cc, dd, boundaries, ind, stride, ind_bound, len);
+        a, b, c, d, aa, cc, dd, boundaries, ind, stride, ind_bound, sys_size);
   }
 }
 
@@ -179,12 +165,12 @@ __device__ void trid_strided_multidim_backward_kernel(
   else       u[ind + (sys_size - 1) * stride] += dd_last;
 }
 
-template <typename REAL, int BLOCKING_FACTOR, int INC>
+template <typename REAL, int INC>
 __global__ void
 trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
                                const REAL *__restrict__ dd, REAL *__restrict__ d,
                                REAL *__restrict__ u, const REAL *__restrict__ boundaries, 
-                               int solvedim, int sys_n, const int *dims, int split_factor) {
+                               int solvedim, int sys_n, const int *dims) {
   //
   // set up indices for main block
   //
@@ -196,8 +182,7 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restri
   //int tridNum = tid % sys_n;
   //int subTridNum = tid / sys_n;
         
-  int tridNum = (tid % BLOCKING_FACTOR) + (tid / (BLOCKING_FACTOR * split_factor)) * BLOCKING_FACTOR;
-  int subTridNum = (tid % (BLOCKING_FACTOR * split_factor)) / BLOCKING_FACTOR;
+  int tridNum = tid;
   
   int ind;
   int stride;
@@ -210,24 +195,12 @@ trid_strided_multidim_backward(const REAL *__restrict__ aa, const REAL *__restri
     stride = dims[0] * dims[1];
   }
   
-  int ind_bound = (tridNum * split_factor + subTridNum) * 2;
+  int ind_bound = tridNum * 2;
   int sys_size = dims[solvedim];
-  
-  int totalTrids = sys_n * split_factor;
-  int offset = subTridNum * (sys_size / split_factor);
-  int len;
-  
-  if(subTridNum == split_factor - 1) {
-    len = sys_size - offset;
-  } else {
-    len = sys_size / split_factor;
-  }
-  
-  ind += offset * stride;
 
-  if (tid < totalTrids) {
+  if (tid < sys_n) {
     trid_strided_multidim_backward_kernel<REAL, INC>(
-        aa, cc, dd, d, u, boundaries, ind, stride, ind_bound, len);
+        aa, cc, dd, d, u, boundaries, ind, stride, ind_bound, sys_size);
   }
 }
 
