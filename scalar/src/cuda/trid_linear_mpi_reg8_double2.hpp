@@ -44,7 +44,7 @@
 
 typedef union {
   double2 vec[VEC/2];
-  double  f[VEC];
+  REAL  f[VEC];
 } double8;
 
 // transpose4x4xor() - exchanges data between 4 consecutive threads
@@ -111,7 +111,7 @@ inline __device__ void transpose4x4xor(double8* la) {
 
 // ga - global array
 // la - local array
-inline __device__ void load_array_reg8_double2(const double* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
+inline __device__ void load_array_reg8_double2(const REAL* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -134,7 +134,7 @@ inline __device__ void load_array_reg8_double2(const double* __restrict__ ga, do
 // Same as load_array_reg8() with the following exception: if sys_pads would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
 // ga - global array
 // la - local array
-inline __device__ void load_array_reg8_double2_unaligned(double const* __restrict__ ga, double8* la, int n, int tid, int sys_pads, int sys_length) {
+inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict__ ga, double8* la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -212,8 +212,8 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       }
       
       for(int i = 2; i < VEC; i++) {
-        bb = static_cast<REAL>(1.0) / (l_b.f[i] - a_l.f[i] * c2);
-        d2 = (l_d.f[i] - a_l.f[i] * d2) * bb;
+        bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
+        d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
         a2 = (-l_a.f[i] * a2) * bb;
         c2 = l_c.f[i] * bb;
         l_dd.f[i] = d2;
@@ -233,8 +233,8 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
-            bb = static_cast<REAL>(1.0) / (l_b.f[i] - a_l.f[i] * c2);
-            d2 = (l_d.f[i] - a_l.f[i] * d2) * bb;
+            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
+            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
             a2 = (-l_a.f[i] * a2) * bb;
             c2 = l_c.f[i] * bb;
             l_dd.f[i] = d2;
