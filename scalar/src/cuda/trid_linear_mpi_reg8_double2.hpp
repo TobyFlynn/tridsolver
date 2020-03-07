@@ -252,6 +252,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   const int active_thread   = optimized_solve || boundary_solve;
   // TODO Check if aligned memory 
   //const int aligned         = !(sys_pads % ALIGN_DOUBLE);
+  const int aligned         = !(sys_size % ALIGN_DOUBLE);
   
   int n = 0;
   int b_ind = tid * 6;
@@ -262,38 +263,39 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   
   if(active_thread) {
     if(optimized_solve) {
-      // Process first vector separately
-      load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
-      
-      for (int i = 0; i < 2; i++) {
-        bb = static_cast<REAL>(1.0) / l_b.f[i];
-        d2 = bb * l_d.f[i];
-        a2 = bb * l_a.f[i];
-        c2 = bb * l_c.f[i];
-        l_dd.f[i] = d2;
-        l_aa.f[i] = a2;
-        l_cc.f[i] = c2;
-      }
-      
-      for(int i = 2; i < VEC; i++) {
-        bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
-        d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-        a2 = (-l_a.f[i] * a2) * bb;
-        c2 = l_c.f[i] * bb;
-        l_dd.f[i] = d2;
-        l_aa.f[i] = a2;
-        l_cc.f[i] = c2;
-      }
-      
-      store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-      store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-      store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-      
-      // Forward pass
-      for(n = VEC; n < sys_size; n += VEC) {
+      if(aligned) {
+        // Process first vector separately
+        load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
+        
+        for (int i = 0; i < 2; i++) {
+          bb = static_cast<REAL>(1.0) / l_b.f[i];
+          d2 = bb * l_d.f[i];
+          a2 = bb * l_a.f[i];
+          c2 = bb * l_c.f[i];
+          l_dd.f[i] = d2;
+          l_aa.f[i] = a2;
+          l_cc.f[i] = c2;
+        }
+        
+        for(int i = 2; i < VEC; i++) {
+          bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
+          d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
+          a2 = (-l_a.f[i] * a2) * bb;
+          c2 = l_c.f[i] * bb;
+          l_dd.f[i] = d2;
+          l_aa.f[i] = a2;
+          l_cc.f[i] = c2;
+        }
+        
+        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+        
+        // Forward pass
+        for(n = VEC; n < sys_size; n += VEC) {
           load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
           load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
           load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
@@ -312,10 +314,6 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
           store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
         }
-        
-//         boundaries[b_ind + 1] = a2[sys_size - 1];
-//         boundaries[b_ind + 3] = c2[sys_size - 1];
-//         boundaries[b_ind + 5] = d2[sys_size - 1];
         
         n = sys_size - VEC;
         
@@ -383,18 +381,6 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
         
-        // Eliminate upper off-diagonal
-        /*for (int i = VEC - 1; i > 0; --i) {
-          int loc_ind = ind + i;
-          dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
-          aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
-          cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
-        }
-        bb = static_cast<REAL>(1.0) /
-            (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
-        dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
-        aa[ind] = bb * aa[ind];
-        cc[ind] = bb * (-cc[ind] * cc[ind + 1]);*/
         // prepare boundaries for communication
         int i = tid * 6;
         boundaries[i + 0] = aa[ind];
@@ -403,85 +389,9 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         boundaries[i + 3] = cc[ind + sys_size - 1];
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
-        
-//         // Last vector processed separately
-//         /*d2 = l_dd.f[VEC - 2];
-//         c2 = l_cc.f[VEC - 2];
-//         a2 = l_aa.f[VEC - 2];*/
-//         n = sys_size - VEC;
-//         for(int i = VEC - 1; i > VEC - 3; i--) {
-//           int ind_l = n + i;
-//           l_dd.f[i] = d2[ind_l];
-//           l_aa.f[i] = a2[ind_l];
-//           l_cc.f[i] = c2[ind_l];
-//         }
-//         for(int i = VEC - 3; i >= 0; i--) {
-//           int ind_l = n + i;
-//           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-//           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-//           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-// //           l_dd.f[i] = d2;
-// //           l_aa.f[i] = a2;
-// //           l_cc.f[i] = c2;
-//         }
-//         
-//         store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-//         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-//         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-//         
-//         // Backwards pass
-//         for(n = sys_size - 2*VEC; n > 0; n -= VEC) {
-//           /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-//           load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-//           load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-//           for(int i = VEC - 1; i >= 0; i--) {
-//             int ind_l = n + i;
-//             l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-//             l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-//             l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-//             /*l_dd.f[i] = d2;
-//             l_aa.f[i] = a2;
-//             l_cc.f[i] = c2;*/
-//           }
-//           store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-//           store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-//           store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-//         }
-//         
-//         // Handle first vector separately
-//         n = 0;
-//         /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-//         load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-//         load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-//         
-//         for(int i = VEC - 1; i > 0; i--) {
-//           int ind_l = n + i;
-//           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-//           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-//           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-//           /*l_dd.f[i] = d2;
-//           l_aa.f[i] = a2;
-//           l_cc.f[i] = c2;*/
-//         }
-//         
-//         bb = static_cast<REAL>(1.0) / (static_cast<REAL>(1.0) - c2[0] * a2[1]);
-//         l_dd.f[0] = bb * (d2[0] - c2[0] * d2[1]);
-//         l_aa.f[0] = bb * a2[0];
-//         l_cc.f[0] = bb * (-c2[0] * c2[1]);
-//         
-//         store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-//         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-//         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-//         
-//         boundaries[b_ind] = a2[0];
-//         boundaries[b_ind + 2] = c2[0];
-//         boundaries[b_ind + 4] = d2[0];
-//         /*boundaries[b_ind + 0] = aa[ind];
-//         boundaries[b_ind + 1] = aa[ind + sys_size - 1];
-//         boundaries[b_ind + 2] = cc[ind];
-//         boundaries[b_ind + 3] = cc[ind + sys_size - 1];
-//         boundaries[b_ind + 4] = dd[ind];
-//         boundaries[b_ind + 5] = dd[ind + sys_size - 1];*/
+      } else {
+        // TODO
+      }
     } else {
       //
       // forward pass
