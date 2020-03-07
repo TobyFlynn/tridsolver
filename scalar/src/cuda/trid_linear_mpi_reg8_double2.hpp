@@ -280,9 +280,9 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       
       for(int i = 2; i < VEC; i++) {
         bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
-        d2[i] = (l_d.f[i] - l_a.f[i] * d2) * bb;
-        a2[i] = (-l_a.f[i] * a2) * bb;
-        c2[i] = l_c.f[i] * bb;
+        d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
+        a2 = (-l_a.f[i] * a2) * bb;
+        c2 = l_c.f[i] * bb;
         l_dd.f[i] = d2;
         l_aa.f[i] = a2;
         l_cc.f[i] = c2;
