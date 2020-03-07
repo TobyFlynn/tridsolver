@@ -317,8 +317,31 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
 //         boundaries[b_ind + 3] = c2[sys_size - 1];
 //         boundaries[b_ind + 5] = d2[sys_size - 1];
         
+        n = sys_size - VEC;
+        
+        load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+        
+        a2 = l_aa.f[VEC - 2];
+        c2 = l_cc.f[VEC - 2];
+        d2 = l_dd.f[VEC - 2];
+        
+        for(int i = VEC - 3; i >= 0; i--) {
+          d2 = l_dd.f[i] - l_cc.f[i] * d2;
+          a2 = l_aa.f[i] - l_cc.f[i] * a2;
+          c2 = -l_cc.f[i] * c2;
+          l_dd.f[i] = d2;
+          l_cc.f[i] = c2;
+          l_aa.f[i] = a2;
+        }
+        
+        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+        
         // Eliminate upper off-diagonal
-        for (int i = sys_size - 3; i > 0; --i) {
+        for (int i = sys_size - VEC - 1; i > 0; --i) {
           int loc_ind = ind + i;
           dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
           aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
