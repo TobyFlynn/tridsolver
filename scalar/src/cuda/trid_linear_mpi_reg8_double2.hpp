@@ -261,141 +261,141 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   REAL bb, a2[N_MAX], c2[N_MAX], d2[N_MAX];
   
   if(active_thread) {
-    if(optimized_solve) {
-      // Process first vector separately
-      load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
-      load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
-      
-      for (int i = 0; i < 2; i++) {
-        bb = static_cast<REAL>(1.0) / l_b.f[i];
-        d2[i] = bb * l_d.f[i];
-        a2[i] = bb * l_a.f[i];
-        c2[i] = bb * l_c.f[i];
-        /*l_dd.f[i] = d2;
-        l_aa.f[i] = a2;
-        l_cc.f[i] = c2;*/
-      }
-      
-      for(int i = 2; i < VEC; i++) {
-        bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[i-1]);
-        d2[i] = (l_d.f[i] - l_a.f[i] * d2[i-1]) * bb;
-        a2[i] = (-l_a.f[i] * a2[i-1]) * bb;
-        c2[i] = l_c.f[i] * bb;
-        /*l_dd.f[i] = d2;
-        l_aa.f[i] = a2;
-        l_cc.f[i] = c2;*/
-      }
-      
-      /*store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-      store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-      store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-      
-      // Forward pass
-      for(n = VEC; n < sys_size; n += VEC) {
-          load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
-          #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
-            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[n + i - 1]);
-            d2[n + i] = (l_d.f[i] - l_a.f[i] * d2[n + i - 1]) * bb;
-            a2[n + i] = (-l_a.f[i] * a2[n + i - 1]) * bb;
-            c2[n + i] = l_c.f[i] * bb;
-            /*l_dd.f[i] = d2;
-            l_aa.f[i] = a2;
-            l_cc.f[i] = c2;*/
-          }
-          /*store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-        }
-        
-        boundaries[b_ind + 1] = a2[sys_size - 1];
-        boundaries[b_ind + 3] = c2[sys_size - 1];
-        boundaries[b_ind + 5] = d2[sys_size - 1];
-        
-        // Last vector processed separately
-        /*d2 = l_dd.f[VEC - 2];
-        c2 = l_cc.f[VEC - 2];
-        a2 = l_aa.f[VEC - 2];*/
-        n = sys_size - VEC;
-        for(int i = VEC - 1; i > VEC - 3; i--) {
-          int ind_l = n + i;
-          l_dd.f[i] = d2[ind_l];
-          l_aa.f[i] = a2[ind_l];
-          l_cc.f[i] = c2[ind_l];
-        }
-        for(int i = VEC - 3; i >= 0; i--) {
-          int ind_l = n + i;
-          l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-          l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-          l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-//           l_dd.f[i] = d2;
+//     if(optimized_solve) {
+//       // Process first vector separately
+//       load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
+//       load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
+//       load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
+//       load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
+//       
+//       for (int i = 0; i < 2; i++) {
+//         bb = static_cast<REAL>(1.0) / l_b.f[i];
+//         d2[i] = bb * l_d.f[i];
+//         a2[i] = bb * l_a.f[i];
+//         c2[i] = bb * l_c.f[i];
+//         /*l_dd.f[i] = d2;
+//         l_aa.f[i] = a2;
+//         l_cc.f[i] = c2;*/
+//       }
+//       
+//       for(int i = 2; i < VEC; i++) {
+//         bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[i-1]);
+//         d2[i] = (l_d.f[i] - l_a.f[i] * d2[i-1]) * bb;
+//         a2[i] = (-l_a.f[i] * a2[i-1]) * bb;
+//         c2[i] = l_c.f[i] * bb;
+//         /*l_dd.f[i] = d2;
+//         l_aa.f[i] = a2;
+//         l_cc.f[i] = c2;*/
+//       }
+//       
+//       /*store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//       store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//       store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
+//       
+//       // Forward pass
+//       for(n = VEC; n < sys_size; n += VEC) {
+//           load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
+//           load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
+//           load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
+//           load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
+//           #pragma unroll 16
+//           for(int i=0; i<VEC; i++) {
+//             bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[n + i - 1]);
+//             d2[n + i] = (l_d.f[i] - l_a.f[i] * d2[n + i - 1]) * bb;
+//             a2[n + i] = (-l_a.f[i] * a2[n + i - 1]) * bb;
+//             c2[n + i] = l_c.f[i] * bb;
+//             /*l_dd.f[i] = d2;
+//             l_aa.f[i] = a2;
+//             l_cc.f[i] = c2;*/
+//           }
+//           /*store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//           store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//           store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
+//         }
+//         
+//         boundaries[b_ind + 1] = a2[sys_size - 1];
+//         boundaries[b_ind + 3] = c2[sys_size - 1];
+//         boundaries[b_ind + 5] = d2[sys_size - 1];
+//         
+//         // Last vector processed separately
+//         /*d2 = l_dd.f[VEC - 2];
+//         c2 = l_cc.f[VEC - 2];
+//         a2 = l_aa.f[VEC - 2];*/
+//         n = sys_size - VEC;
+//         for(int i = VEC - 1; i > VEC - 3; i--) {
+//           int ind_l = n + i;
+//           l_dd.f[i] = d2[ind_l];
+//           l_aa.f[i] = a2[ind_l];
+//           l_cc.f[i] = c2[ind_l];
+//         }
+//         for(int i = VEC - 3; i >= 0; i--) {
+//           int ind_l = n + i;
+//           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
+//           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
+//           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
+// //           l_dd.f[i] = d2;
+// //           l_aa.f[i] = a2;
+// //           l_cc.f[i] = c2;
+//         }
+//         
+//         store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+//         
+//         // Backwards pass
+//         for(n = sys_size - 2*VEC; n > 0; n -= VEC) {
+//           /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//           load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//           load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
+//           for(int i = VEC - 1; i >= 0; i--) {
+//             int ind_l = n + i;
+//             l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
+//             l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
+//             l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
+//             /*l_dd.f[i] = d2;
+//             l_aa.f[i] = a2;
+//             l_cc.f[i] = c2;*/
+//           }
+//           store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//           store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//           store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+//         }
+//         
+//         // Handle first vector separately
+//         n = 0;
+//         /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//         load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//         load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
+//         
+//         for(int i = VEC - 1; i > 0; i--) {
+//           int ind_l = n + i;
+//           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
+//           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
+//           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
+//           /*l_dd.f[i] = d2;
 //           l_aa.f[i] = a2;
-//           l_cc.f[i] = c2;
-        }
-        
-        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-        
-        // Backwards pass
-        for(n = sys_size - 2*VEC; n > 0; n -= VEC) {
-          /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-          for(int i = VEC - 1; i >= 0; i--) {
-            int ind_l = n + i;
-            l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-            l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-            l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-            /*l_dd.f[i] = d2;
-            l_aa.f[i] = a2;
-            l_cc.f[i] = c2;*/
-          }
-          store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-        }
-        
-        // Handle first vector separately
-        n = 0;
-        /*load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-        load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-        load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
-        
-        for(int i = VEC - 1; i > 0; i--) {
-          int ind_l = n + i;
-          l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
-          l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
-          l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
-          /*l_dd.f[i] = d2;
-          l_aa.f[i] = a2;
-          l_cc.f[i] = c2;*/
-        }
-        
-        bb = static_cast<REAL>(1.0) / (static_cast<REAL>(1.0) - c2[0] * a2[1]);
-        l_dd.f[0] = bb * (d2[0] - c2[0] * d2[1]);
-        l_aa.f[0] = bb * a2[0];
-        l_cc.f[0] = bb * (-c2[0] * c2[1]);
-        
-        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-        
-        boundaries[b_ind] = a2[0];
-        boundaries[b_ind + 2] = c2[0];
-        boundaries[b_ind + 4] = d2[0];
-        /*boundaries[b_ind + 0] = aa[ind];
-        boundaries[b_ind + 1] = aa[ind + sys_size - 1];
-        boundaries[b_ind + 2] = cc[ind];
-        boundaries[b_ind + 3] = cc[ind + sys_size - 1];
-        boundaries[b_ind + 4] = dd[ind];
-        boundaries[b_ind + 5] = dd[ind + sys_size - 1];*/
-    } else {
+//           l_cc.f[i] = c2;*/
+//         }
+//         
+//         bb = static_cast<REAL>(1.0) / (static_cast<REAL>(1.0) - c2[0] * a2[1]);
+//         l_dd.f[0] = bb * (d2[0] - c2[0] * d2[1]);
+//         l_aa.f[0] = bb * a2[0];
+//         l_cc.f[0] = bb * (-c2[0] * c2[1]);
+//         
+//         store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+//         store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+//         store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+//         
+//         boundaries[b_ind] = a2[0];
+//         boundaries[b_ind + 2] = c2[0];
+//         boundaries[b_ind + 4] = d2[0];
+//         /*boundaries[b_ind + 0] = aa[ind];
+//         boundaries[b_ind + 1] = aa[ind + sys_size - 1];
+//         boundaries[b_ind + 2] = cc[ind];
+//         boundaries[b_ind + 3] = cc[ind + sys_size - 1];
+//         boundaries[b_ind + 4] = dd[ind];
+//         boundaries[b_ind + 5] = dd[ind + sys_size - 1];*/
+//     } else {
       //
       // forward pass
       //
@@ -437,7 +437,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       boundaries[i + 3] = cc[ind + sys_size - 1];
       boundaries[i + 4] = dd[ind];
       boundaries[i + 5] = dd[ind + sys_size - 1];
-    }
+//     }
   }
 }
 
