@@ -300,10 +300,10 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
-            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[n * VEC + i - 1]);
-            d2[n * VEC + i] = (l_d.f[i] - l_a.f[i] * d2[n * VEC + i - 1]) * bb;
-            a2[n * VEC + i] = (-l_a.f[i] * a2[n * VEC + i - 1]) * bb;
-            c2[n * VEC + i] = l_c.f[i] * bb;
+            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2[n + i - 1]);
+            d2[n + i] = (l_d.f[i] - l_a.f[i] * d2[n + i - 1]) * bb;
+            a2[n + i] = (-l_a.f[i] * a2[n + i - 1]) * bb;
+            c2[n + i] = l_c.f[i] * bb;
             /*l_dd.f[i] = d2;
             l_aa.f[i] = a2;
             l_cc.f[i] = c2;*/
@@ -323,13 +323,13 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         a2 = l_aa.f[VEC - 2];*/
         n = sys_size - VEC;
         for(int i = VEC - 1; i > VEC - 3; i--) {
-          int ind_l = n * VEC + i;
+          int ind_l = n + i;
           l_dd.f[i] = d2[ind_l];
           l_aa.f[i] = a2[ind_l];
           l_cc.f[i] = c2[ind_l];
         }
         for(int i = VEC - 3; i >= 0; i--) {
-          int ind_l = n * VEC + i;
+          int ind_l = n + i;
           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
@@ -348,7 +348,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
           load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
           for(int i = VEC - 1; i >= 0; i--) {
-            int ind_l = n * VEC + i;
+            int ind_l = n + i;
             l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
             l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
             l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
@@ -368,7 +368,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);*/
         
         for(int i = VEC - 1; i > 0; i--) {
-          int ind_l = n * VEC + i;
+          int ind_l = n + i;
           l_dd.f[i] = d2[ind_l] - c2[ind_l] * d2[ind_l + 1];
           l_aa.f[i] = a2[ind_l] - c2[ind_l] * a2[ind_l + 1];
           l_cc.f[i] = -c2[ind_l] * c2[ind_l + 1];
