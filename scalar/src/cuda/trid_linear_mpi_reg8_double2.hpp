@@ -390,7 +390,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
       } else {
-        int rounded_sys_size = (sys_size/VEC)*VEC;
+        /*int rounded_sys_size = (sys_size/VEC)*VEC;
         
         // Process first vector separately
         load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
@@ -466,6 +466,50 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         aa[ind] = bb * aa[ind];
         cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
         
+        int i = tid * 6;
+        boundaries[i + 0] = aa[ind];
+        boundaries[i + 1] = aa[ind + sys_size - 1];
+        boundaries[i + 2] = cc[ind];
+        boundaries[i + 3] = cc[ind + sys_size - 1];
+        boundaries[i + 4] = dd[ind];
+        boundaries[i + 5] = dd[ind + sys_size - 1];*/
+        
+        // TODO deal with unaligned memory
+        
+        //
+        // forward pass
+        //
+        for (int i = 0; i < 2; ++i) {
+          bb = static_cast<REAL>(1.0) / b[ind + i];
+          dd[ind + i] = bb * d[ind + i];
+          aa[ind + i] = bb * a[ind + i];
+          cc[ind + i] = bb * c[ind + i];
+        }
+
+        if (sys_size >= 3) {
+          // eliminate lower off-diagonal
+          for (int i = 2; i < sys_size; i++) {
+            int loc_ind = ind + i;
+            bb = static_cast<REAL>(1.0) /
+                (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+            dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
+            aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
+            cc[loc_ind] = c[loc_ind] * bb;
+          }
+          // Eliminate upper off-diagonal
+          for (int i = sys_size - 3; i > 0; --i) {
+            int loc_ind = ind + i;
+            dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
+            aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
+            cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
+          }
+          bb = static_cast<REAL>(1.0) /
+              (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
+          dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
+          aa[ind] = bb * aa[ind];
+          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
+        }
+        // prepare boundaries for communication
         int i = tid * 6;
         boundaries[i + 0] = aa[ind];
         boundaries[i + 1] = aa[ind + sys_size - 1];
