@@ -359,8 +359,32 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
         }
         
+        n = 0;
+        
+        load_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+        load_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+        
+        for(int i = VEC - 1; i > 0; i--) {
+          d2 = l_dd.f[i] - l_cc.f[i] * d2;
+          a2 = l_aa.f[i] - l_cc.f[i] * a2;
+          c2 = -l_cc.f[i] * c2;
+          l_dd.f[i] = d2;
+          l_cc.f[i] = c2;
+          l_aa.f[i] = a2;
+        }
+        
+        bb = static_cast<REAL>(1.0) / (static_cast<REAL>(1.0) - l_cc.f[0] * a2);
+        l_dd.f[0] = bb * (l_dd.f[0] - l_cc.f[0] * d2);
+        l_aa.f[0] = bb * l_aa.f[0];
+        l_cc.f[0] = bb * (-l_cc.f[0] * c2);
+        
+        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
+        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
+        
         // Eliminate upper off-diagonal
-        for (int i = VEC - 1; i > 0; --i) {
+        /*for (int i = VEC - 1; i > 0; --i) {
           int loc_ind = ind + i;
           dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
           aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
@@ -370,7 +394,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
             (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
         dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
         aa[ind] = bb * aa[ind];
-        cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
+        cc[ind] = bb * (-cc[ind] * cc[ind + 1]);*/
         // prepare boundaries for communication
         int i = tid * 6;
         boundaries[i + 0] = aa[ind];
