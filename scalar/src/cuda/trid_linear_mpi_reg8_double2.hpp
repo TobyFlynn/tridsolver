@@ -495,8 +495,8 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
   double8 l_aa, l_cc, l_dd, l_d, l_u;
   
   if(active_thread) {
-    REAL dd0 = boundaries[2 * tid];
-    REAL ddn = boundaries[2 * tid + 1];
+    double dd0 = boundaries[2 * tid];
+    double ddn = boundaries[2 * tid + 1];
     if(optimized_solve) {
       if(aligned) {
         if(INC) {
