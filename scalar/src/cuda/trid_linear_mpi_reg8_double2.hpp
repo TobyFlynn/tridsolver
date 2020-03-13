@@ -35,13 +35,13 @@
 
 #define VEC 8 
 #define WARP_SIZE 32
+#define ALIGN_DOUBLE 8
 
 #include <assert.h>
 #include <sm_35_intrinsics.h>
 #include <generics/generics/shfl.h>
 
 #include "cuda_shfl.h"
-#include "trid_common.h"
 
 template<typename REAL>
 union double8 {
@@ -251,8 +251,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   // A thread is active only if it works on valid memory
   const int active_thread   = optimized_solve || boundary_solve;
   // TODO Check if aligned memory 
-  //const int aligned         = !(sys_pads % ALIGN_DOUBLE);
-  const int aligned         = !(sys_size % ALIGN_DOUBLE);
+  const int aligned         = (sys_pads % ALIGN_DOUBLE) == 0;
   
   int n = 0;
   int b_ind = tid * 6;
@@ -390,92 +389,6 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
       } else {
-        /*int rounded_sys_size = (sys_size/VEC)*VEC;
-        
-        // Process first vector separately
-        load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
-        load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
-        load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
-        load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
-        
-        for (int i = 0; i < 2; i++) {
-          bb = static_cast<REAL>(1.0) / l_b.f[i];
-          d2 = bb * l_d.f[i];
-          a2 = bb * l_a.f[i];
-          c2 = bb * l_c.f[i];
-          l_dd.f[i] = d2;
-          l_aa.f[i] = a2;
-          l_cc.f[i] = c2;
-        }
-        
-        for(int i = 2; i < VEC; i++) {
-          bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
-          d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-          a2 = (-l_a.f[i] * a2) * bb;
-          c2 = l_c.f[i] * bb;
-          l_dd.f[i] = d2;
-          l_aa.f[i] = a2;
-          l_cc.f[i] = c2;
-        }
-        
-        store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-        
-        // Forward pass
-        for(n = VEC; n < rounded_sys_size; n += VEC) {
-          load_array_reg8_double2<REAL>(a,&l_a,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(b,&l_b,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(c,&l_c,n, woffset, sys_size);
-          load_array_reg8_double2<REAL>(d,&l_d,n, woffset, sys_size);
-          #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
-            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
-            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-            a2 = (-l_a.f[i] * a2) * bb;
-            c2 = l_c.f[i] * bb;
-            l_dd.f[i] = d2;
-            l_aa.f[i] = a2;
-            l_cc.f[i] = c2;
-          }
-          store_array_reg8_double2<REAL>(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2<REAL>(aa,&l_aa,n, woffset, sys_size);
-        }
-        
-        // Forward on unaligned section
-        for (int i = rounded_sys_size; i < sys_size; i++) {
-          int loc_ind = ind + i;
-          bb = static_cast<REAL>(1.0) /
-              (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-          dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-          aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-          cc[loc_ind] = c[loc_ind] * bb;
-        }
-        
-        // TODO
-        for (int i = sys_size - 3; i > 0; --i) {
-          int loc_ind = ind + i;
-          dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
-          aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
-          cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
-        }
-        bb = static_cast<REAL>(1.0) /
-            (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
-        dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
-        aa[ind] = bb * aa[ind];
-        cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
-        
-        int i = tid * 6;
-        boundaries[i + 0] = aa[ind];
-        boundaries[i + 1] = aa[ind + sys_size - 1];
-        boundaries[i + 2] = cc[ind];
-        boundaries[i + 3] = cc[ind + sys_size - 1];
-        boundaries[i + 4] = dd[ind];
-        boundaries[i + 5] = dd[ind + sys_size - 1];*/
-        
-        // TODO deal with unaligned memory
-        
         //
         // forward pass
         //
@@ -517,7 +430,6 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         boundaries[i + 3] = cc[ind + sys_size - 1];
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
-      }
     } else {
       //
       // forward pass
