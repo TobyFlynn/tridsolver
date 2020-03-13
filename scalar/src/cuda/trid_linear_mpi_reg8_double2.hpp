@@ -44,7 +44,7 @@
 
 union double8 {
   double2 vec[VEC/2];
-  REAL  f[VEC];
+  double  f[VEC];
 };
 
 // transpose4x4xor() - exchanges data between 4 consecutive threads
@@ -111,7 +111,7 @@ inline __device__ void transpose4x4xor(double8* la) {
 
 // ga - global array
 // la - local array
-inline __device__ void load_array_reg8_double2(const REAL* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
+inline __device__ void load_array_reg8_double2(const double* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -134,7 +134,7 @@ inline __device__ void load_array_reg8_double2(const REAL* __restrict__ ga, doub
 // Same as load_array_reg8() with the following exception: if sys_pads would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
 // ga - global array
 // la - local array
-inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict__ ga, double8* la, int n, int tid, int sys_pads, int sys_length) {
+inline __device__ void load_array_reg8_double2_unaligned(double const* __restrict__ ga, double8* la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -156,15 +156,14 @@ inline __device__ void load_array_reg8_double2_unaligned(REAL const* __restrict_
     gind        += sys_pads;                         // Stride to the next system
   }
 
-  transpose4x4xor<REAL>(la);
+  transpose4x4xor(la);
 
 }
 
 // Store a tile with 32x16 elements into 32 double8 struct allocated in registers. Every 4 consecutive threads cooperate to transpose and store a 4 x double2 sub-tile.
 // ga - global array
 // la - local array
-template<typename REAL>
-inline __device__ void store_array_reg8_double2(REAL* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
+inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8* la, int n, int woffset, int sys_pads) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -195,8 +194,7 @@ inline __device__ void store_array_reg8_double2(REAL* __restrict__ ga, double8* 
 // Same as store_array_reg8() with the following exception: if stride would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
 // ga - global array
 // la - local array
-template<typename REAL>
-inline __device__ void store_array_reg8_double2_unaligned(REAL* __restrict__ ga, double8* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
+inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
   int gind; // Global memory index of an element
   // Array indexing can be decided in compile time -> arrays will stay in registers
   // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
@@ -223,12 +221,11 @@ inline __device__ void store_array_reg8_double2_unaligned(REAL* __restrict__ ga,
 }
 
 // TODO eliminate extra loads and stores
-template <typename REAL>
 __global__ void
-trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
-                    const REAL *__restrict__ c, const REAL *__restrict__ d,
-                    REAL *__restrict__ aa, REAL *__restrict__ cc,
-                    REAL *__restrict__ dd, REAL *__restrict__ boundaries,
+trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
+                    const double *__restrict__ c, const double *__restrict__ d,
+                    double *__restrict__ aa, double *__restrict__ cc,
+                    double *__restrict__ dd, double *__restrict__ boundaries,
                     int sys_size, int sys_pads, int sys_n) {
   // Thread ID in global scope - every thread solves one system
   const int tid = threadIdx.x + threadIdx.y * blockDim.x +
@@ -253,7 +250,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   int ind = sys_pads * tid;
   
   double8 l_a, l_b, l_c, l_d, l_aa, l_cc, l_dd;
-  REAL bb, a2, c2, d2;
+  double bb, a2, c2, d2;
   
   if(active_thread) {
     if(optimized_solve) {
@@ -265,7 +262,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
         
         for (int i = 0; i < 2; i++) {
-          bb = static_cast<REAL>(1.0) / l_b.f[i];
+          bb = 1.0 / l_b.f[i];
           d2 = bb * l_d.f[i];
           a2 = bb * l_a.f[i];
           c2 = bb * l_c.f[i];
@@ -275,7 +272,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         }
         
         for(int i = 2; i < VEC; i++) {
-          bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
+          bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
           d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
           a2 = (-l_a.f[i] * a2) * bb;
           c2 = l_c.f[i] * bb;
@@ -296,7 +293,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
-            bb = static_cast<REAL>(1.0) / (l_b.f[i] - l_a.f[i] * c2);
+            bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
             d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
             a2 = (-l_a.f[i] * a2) * bb;
             c2 = l_c.f[i] * bb;
@@ -366,7 +363,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           l_aa.f[i] = a2;
         }
         
-        bb = static_cast<REAL>(1.0) / (static_cast<REAL>(1.0) - l_cc.f[0] * a2);
+        bb = 1.0 / (1.0 - l_cc.f[0] * a2);
         l_dd.f[0] = bb * (l_dd.f[0] - l_cc.f[0] * d2);
         l_aa.f[0] = bb * l_aa.f[0];
         l_cc.f[0] = bb * (-l_cc.f[0] * c2);
@@ -388,7 +385,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         // forward pass
         //
         for (int i = 0; i < 2; ++i) {
-          bb = static_cast<REAL>(1.0) / b[ind + i];
+          bb = 1.0 / b[ind + i];
           dd[ind + i] = bb * d[ind + i];
           aa[ind + i] = bb * a[ind + i];
           cc[ind + i] = bb * c[ind + i];
@@ -398,8 +395,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           // eliminate lower off-diagonal
           for (int i = 2; i < sys_size; i++) {
             int loc_ind = ind + i;
-            bb = static_cast<REAL>(1.0) /
-                (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+            bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
             dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
             aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
             cc[loc_ind] = c[loc_ind] * bb;
@@ -411,8 +407,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
             aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
             cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
           }
-          bb = static_cast<REAL>(1.0) /
-              (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
+          bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
           dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
           aa[ind] = bb * aa[ind];
           cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
@@ -430,7 +425,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
       // forward pass
       //
       for (int i = 0; i < 2; ++i) {
-        bb = static_cast<REAL>(1.0) / b[ind + i];
+        bb = 1.0 / b[ind + i];
         dd[ind + i] = bb * d[ind + i];
         aa[ind + i] = bb * a[ind + i];
         cc[ind + i] = bb * c[ind + i];
@@ -440,8 +435,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
         // eliminate lower off-diagonal
         for (int i = 2; i < sys_size; i++) {
           int loc_ind = ind + i;
-          bb = static_cast<REAL>(1.0) /
-              (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+          bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
           dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
           cc[loc_ind] = c[loc_ind] * bb;
@@ -453,8 +447,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
           aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
           cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
         }
-        bb = static_cast<REAL>(1.0) /
-            (static_cast<REAL>(1.0) - cc[ind] * aa[ind + 1]);
+        bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
         dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
         aa[ind] = bb * aa[ind];
         cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
@@ -471,11 +464,11 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   }
 }
 
-template <typename REAL, int INC>
+template <int INC>
 __global__ void
-trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
-                     const REAL *__restrict__ dd, REAL *__restrict__ d,
-                     REAL *__restrict__ u, const REAL *__restrict__ boundaries,
+trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ cc,
+                     const double *__restrict__ dd, double *__restrict__ d,
+                     double *__restrict__ u, const double *__restrict__ boundaries,
                      int sys_size, int sys_pads, int sys_n) {
   // Thread ID in global scope - every thread solves one system
   const int tid = threadIdx.x + threadIdx.y * blockDim.x +
@@ -498,7 +491,7 @@ trid_linear_backward(const REAL *__restrict__ aa, const REAL *__restrict__ cc,
   int n = 0;
   int ind = sys_pads * tid;
   
-  double8<REAL> l_aa, l_cc, l_dd, l_d, l_u;
+  double8 l_aa, l_cc, l_dd, l_d, l_u;
   
   if(active_thread) {
     REAL dd0 = boundaries[2 * tid];

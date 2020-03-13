@@ -248,11 +248,15 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   dim3 dimGrid_x(dimgridx, dimgridy);
   dim3 dimBlock_x(blockdimx, blockdimy);
   if (solvedim == 0) {
-    trid_linear_forward<REAL>
-        <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
-                                    local_eq_size, local_eq_size, sys_n);
-    cudaSafeCall( cudaPeekAtLastError() );
-    cudaSafeCall( cudaDeviceSynchronize() );
+    if(std::is_same<REAL, double>::value) {
+      trid_linear_forward
+          <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
+                                      local_eq_size, local_eq_size, sys_n);
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
+    } else {
+      // TODO
+    }
   } else {
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, b, c, d, aa, cc, dd, boundaries, solvedim, sys_n, d_dims);
@@ -284,10 +288,14 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   //}
 
   if (solvedim == 0) {
-    trid_linear_backward<REAL, INC><<<dimGrid_x, dimBlock_x>>>(
-        aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
-    cudaSafeCall( cudaPeekAtLastError() );
-    cudaSafeCall( cudaDeviceSynchronize() );
+    if(std::is_same<REAL, double>::value) {
+      trid_linear_backward<INC><<<dimGrid_x, dimBlock_x>>>(
+          aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
+    } else {
+      // TODO
+    }
   } else {
     trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u, boundaries, solvedim, sys_n, d_dims);
