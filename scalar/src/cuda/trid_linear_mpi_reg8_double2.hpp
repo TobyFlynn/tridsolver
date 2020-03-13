@@ -420,6 +420,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         boundaries[i + 3] = cc[ind + sys_size - 1];
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
+      }
     } else {
       //
       // forward pass
