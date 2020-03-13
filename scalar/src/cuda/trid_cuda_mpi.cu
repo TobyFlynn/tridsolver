@@ -250,7 +250,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
       trid_linear_forward
-          <<<dimGrid_x, dimBlock_x>>>(a, b, c, d, aa, cc, dd, boundaries,
+          <<<dimGrid_x, dimBlock_x>>>((double *)a, (double *)b, (double *)c, (double *)d, (double *)aa, (double *)cc, (double *)dd, (double *)boundaries,
                                       local_eq_size, local_eq_size, sys_n);
       cudaSafeCall( cudaPeekAtLastError() );
       cudaSafeCall( cudaDeviceSynchronize() );
@@ -290,7 +290,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
       trid_linear_backward<INC><<<dimGrid_x, dimBlock_x>>>(
-          aa, cc, dd, d, u, boundaries, local_eq_size, local_eq_size, sys_n);
+          (double *)aa, (double *)cc, (double *)dd, (double *)d, (double *)u, (double *)boundaries, local_eq_size, local_eq_size, sys_n);
       cudaSafeCall( cudaPeekAtLastError() );
       cudaSafeCall( cudaDeviceSynchronize() );
     } else {
