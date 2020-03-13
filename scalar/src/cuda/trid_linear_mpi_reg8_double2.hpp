@@ -35,7 +35,6 @@
 
 #define VEC 8 
 #define WARP_SIZE 32
-#define ALIGN_DOUBLE 8
 
 #include <assert.h>
 #include <sm_35_intrinsics.h>
@@ -251,7 +250,7 @@ trid_linear_forward(const REAL *__restrict__ a, const REAL *__restrict__ b,
   // A thread is active only if it works on valid memory
   const int active_thread   = optimized_solve || boundary_solve;
   // TODO Check if aligned memory 
-  const int aligned         = (sys_pads % ALIGN_DOUBLE) == 0;
+  const int aligned         = (sys_pads % (ALIGN_DOUBLE * 2)) == 0;
   
   int n = 0;
   int b_ind = tid * 6;
