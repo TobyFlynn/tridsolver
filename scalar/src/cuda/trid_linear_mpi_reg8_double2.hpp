@@ -149,7 +149,8 @@ inline __device__ void load_array_reg8_double2_unaligned(double const* __restric
   //int ind;
   int i;
   for(i=0; i<4; i++) {
-    gind_floor   = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    //gind_floor   = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    gind_floor = (gind/VEC)*VEC + tcol*2;
     //gind_floor   = (gind/4)*4; // Round index to floor
     //(*la).vec[i] = *((double2*)&ga[gind_floor]);    // Get aligned data
     (*la).vec[i] = __ldg( ((double2*)&ga[gind_floor]) );    // Get aligned data
@@ -212,7 +213,8 @@ inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ g
   int i;
   for(i=0; i<4; i++) {
     //gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE ; // Round index to floor
-    gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    //gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    gind_floor = (gind/VEC)*VEC + tcol*2;
     //gind_floor = (gind/4)*4; // Round index to floor double2
     *((double2*)&ga[gind_floor]) = (*la).vec[i];  // Put aligned data
     //*((double2*)&ga[gind_floor]) = (double2){gind_floor, gind_floor,gind_floor, gind_floor};  // Put aligned data
@@ -390,15 +392,13 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
         for(int i = 0; i < VEC * 2; i++) {
           if(i >= sys_off) {
-            int i_off = i - sys_off;
-            int loc_ind = ind + i_off;
-            if(i_off < 2) {
+            int loc_ind = ind_floor + i;
+            if(i - sys_off < 2) {
               bb = 1.0 / b[loc_ind];
               dd[loc_ind] = bb * d[loc_ind];
               aa[loc_ind] = bb * a[loc_ind];
               cc[loc_ind] = bb * c[loc_ind];
             } else {
-              int loc_ind = ind + i_off;
               bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
               dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
               aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
@@ -431,7 +431,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         
         // Handle end of unaligned memory
         for(int i = n; i < sys_size + sys_off; i++) {
-          int loc_ind = ind + i;
+          int loc_ind = ind_floor + i;
           bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
           dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
