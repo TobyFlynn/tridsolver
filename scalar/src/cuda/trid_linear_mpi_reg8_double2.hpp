@@ -410,10 +410,10 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         int n = VEC * 2;
         // Back to normal
         for(; n < sys_size - VEC; n += VEC) {
-          load_array_reg8_double2_unaligned(a,&l_a,n, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(b,&l_b,n, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(c,&l_c,n, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(d,&l_d,n, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(a,&l_a,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(b,&l_b,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(c,&l_c,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(d,&l_d,n, tid, sys_pads, sys_size);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
             bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
@@ -424,9 +424,9 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
             l_aa.f[i] = a2;
             l_cc.f[i] = c2;
           }
-          store_array_reg8_double2_unaligned(dd,&l_dd,n, sys_pads, sys_size);
-          store_array_reg8_double2_unaligned(cc,&l_cc,n, sys_pads, sys_size);
-          store_array_reg8_double2_unaligned(aa,&l_aa,n, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
         }
         
         // Handle end of unaligned memory
