@@ -390,10 +390,10 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         int sys_off   = ind - ind_floor;
         
         // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
-        for(int i = 0; i < VEC * 2; i++) {
-          if(i >= sys_off) {
-            int loc_ind = ind_floor + i;
-            if(i - sys_off < 2) {
+        for(int n = 0; n < VEC * 2; n++) {
+          if(n >= sys_off) {
+            int loc_ind = ind_floor + n;
+            if(n - sys_off < 2) {
               bb = 1.0 / b[loc_ind];
               dd[loc_ind] = bb * d[loc_ind];
               aa[loc_ind] = bb * a[loc_ind];
@@ -407,7 +407,6 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
           }
         }
         
-        int n = VEC * 2;
         // Back to normal
         for(; n < sys_size - VEC; n += VEC) {
           load_array_reg8_double2_unaligned(a, &l_a, n, tid, sys_size, sys_size);
