@@ -435,6 +435,8 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
           store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
         }
         
+        // Finish off unaligned part
+        
         for(int i = n; i < sys_size; i++) {
           int loc_ind = ind + i;
           bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
@@ -442,6 +444,74 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
           cc[loc_ind] = c[loc_ind] * bb;
         }
+        
+        n -= VEC;
+        
+        a2 = aa[sys_size - 2];
+        c2 = cc[sys_size - 2];
+        d2 = dd[sys_size - 2];
+        
+        for(int i = sys_size - 3; i >= n + VEC; i--) {
+          int loc_ind = ind + i;
+          d2 = dd[loc_ind] - cc[loc_ind] * d2;
+          a2 = aa[loc_ind] - cc[loc_ind] * a2;
+          c2 = -cc[loc_ind] * c2;
+          dd[loc_ind] = d2;
+          aa[loc_ind] = a2;
+          cc[loc_ind] = c2;
+        }
+        
+        for(; n > 0; n -= VEC) {
+          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+          
+          for(int i = VEC - 1; i >= 0; i--) {
+            d2 = l_dd.f[i] - l_cc.f[i] * d2;
+            a2 = l_aa.f[i] - l_cc.f[i] * a2;
+            c2 = -l_cc.f[i] * c2;
+            l_dd.f[i] = d2;
+            l_cc.f[i] = c2;
+            l_aa.f[i] = a2;
+          }
+          
+          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        }
+        
+        n = 0;
+        
+        load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+        load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+        
+        for(int i = VEC - 1; i > 0; i--) {
+          d2 = l_dd.f[i] - l_cc.f[i] * d2;
+          a2 = l_aa.f[i] - l_cc.f[i] * a2;
+          c2 = -l_cc.f[i] * c2;
+          l_dd.f[i] = d2;
+          l_cc.f[i] = c2;
+          l_aa.f[i] = a2;
+        }
+        
+        bb = 1.0 / (1.0 - l_cc.f[0] * a2);
+        l_dd.f[0] = bb * (l_dd.f[0] - l_cc.f[0] * d2);
+        l_aa.f[0] = bb * l_aa.f[0];
+        l_cc.f[0] = bb * (-l_cc.f[0] * c2);
+        
+        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        
+        // prepare boundaries for communication
+        int i = tid * 6;
+        boundaries[i + 0] = aa[ind];
+        boundaries[i + 1] = aa[ind + sys_size - 1];
+        boundaries[i + 2] = cc[ind];
+        boundaries[i + 3] = cc[ind + sys_size - 1];
+        boundaries[i + 4] = dd[ind];
+        boundaries[i + 5] = dd[ind + sys_size - 1];
         
         /*// Deal with first elements separately due to not being aligned
         
@@ -516,7 +586,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
             cc[loc_ind] = c[loc_ind] * bb;
           }*/
           // Eliminate upper off-diagonal
-          for (int i = sys_size - 3; i > 0; --i) {
+          /*for (int i = sys_size - 3; i > 0; --i) {
             int loc_ind = ind + i;
             dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
             aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
@@ -534,7 +604,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         boundaries[i + 2] = cc[ind];
         boundaries[i + 3] = cc[ind + sys_size - 1];
         boundaries[i + 4] = dd[ind];
-        boundaries[i + 5] = dd[ind + sys_size - 1];
+        boundaries[i + 5] = dd[ind + sys_size - 1];*/
       }
     } else {
       //
