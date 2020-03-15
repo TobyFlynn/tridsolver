@@ -447,9 +447,9 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         
         n -= VEC;
         
-        a2 = aa[sys_size - 2];
-        c2 = cc[sys_size - 2];
-        d2 = dd[sys_size - 2];
+        a2 = aa[ind + sys_size - 2];
+        c2 = cc[ind + sys_size - 2];
+        d2 = dd[ind + sys_size - 2];
         
         for(int i = sys_size - 3; i >= n + VEC; i--) {
           int loc_ind = ind + i;
@@ -470,7 +470,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
             a2 = l_aa.f[i] - l_cc.f[i] * a2;
             c2 = -l_cc.f[i] * c2;
-            l_dd.f[i] = d2;
+            l_dd.f[i] = d2;n = sys_size - (2*VEC)
             l_cc.f[i] = c2;
             l_aa.f[i] = a2;
           }
