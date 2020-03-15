@@ -95,7 +95,7 @@ __global__ void pcr_on_reduced_kernel(REAL *a, REAL *c, REAL *d, REAL *results,
 }
 
 template<typename REAL>
-__global__ void pcr_on_reduced_kernel_preproc(REAL* input, REAL *a, REAL *c, REAL *d, 
+__global__ void pcr_on_reduced_kernel_preproc(const REAL* input, REAL *a, REAL *c, REAL *d, 
                                       const int sys_n, const int procs, int reducedLen) {
   const int tid = threadIdx.x + threadIdx.y * blockDim.x +
                   blockIdx.x * blockDim.y * blockDim.x +
