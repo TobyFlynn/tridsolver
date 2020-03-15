@@ -512,99 +512,6 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         boundaries[i + 3] = cc[ind + sys_size - 1];
         boundaries[i + 4] = dd[ind];
         boundaries[i + 5] = dd[ind + sys_size - 1];
-        
-        /*// Deal with first elements separately due to not being aligned
-        
-        int ind_floor = (ind/VEC)*VEC;
-        int sys_off   = ind - ind_floor;
-        
-        // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
-        for(n = 0; n < VEC * 2; n++) {
-          if(n >= sys_off) {
-            int loc_ind = ind_floor + n;
-            if(n - sys_off < 2) {
-              bb = 1.0 / b[loc_ind];
-              dd[loc_ind] = bb * d[loc_ind];
-              aa[loc_ind] = bb * a[loc_ind];
-              cc[loc_ind] = bb * c[loc_ind];
-            } else {
-              bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-              dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-              aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-              cc[loc_ind] = c[loc_ind] * bb;
-            }
-          }
-        }
-        
-        // Back to normal
-        for(; n < sys_size - VEC; n += VEC) {
-          load_array_reg8_double2_unaligned(a, &l_a, n, tid, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(b, &l_b, n, tid, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(c, &l_c, n, tid, sys_pads, sys_size);
-          load_array_reg8_double2_unaligned(d, &l_d, n, tid, sys_pads, sys_size);
-          #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
-            bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
-            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-            a2 = (-l_a.f[i] * a2) * bb;
-            c2 = l_c.f[i] * bb;
-            l_dd.f[i] = d2;
-            l_aa.f[i] = a2;
-            l_cc.f[i] = c2;
-          }
-          store_array_reg8_double2_unaligned(dd, &l_dd, n, tid, sys_pads, sys_size);
-          store_array_reg8_double2_unaligned(cc, &l_cc, n, tid, sys_pads, sys_size);
-          store_array_reg8_double2_unaligned(aa, &l_aa, n, tid, sys_pads, sys_size);
-        }
-        
-        // Handle end of unaligned memory
-        for(int i = n; i < sys_size + sys_off; i++) {
-          int loc_ind = ind_floor + i;
-          bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-          dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-          aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-          cc[loc_ind] = c[loc_ind] * bb;
-        }*/
-        
-        /*//
-        // forward pass
-        //
-        for (int i = 0; i < 2; ++i) {
-          bb = 1.0 / b[ind + i];
-          dd[ind + i] = bb * d[ind + i];
-          aa[ind + i] = bb * a[ind + i];
-          cc[ind + i] = bb * c[ind + i];
-        }
-
-        if (sys_size >= 3) {
-          // eliminate lower off-diagonal
-          for (int i = 2; i < sys_size; i++) {
-            int loc_ind = ind + i;
-            bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-            dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-            aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-            cc[loc_ind] = c[loc_ind] * bb;
-          }*/
-          // Eliminate upper off-diagonal
-          /*for (int i = sys_size - 3; i > 0; --i) {
-            int loc_ind = ind + i;
-            dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
-            aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
-            cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
-          }
-          bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
-          dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
-          aa[ind] = bb * aa[ind];
-          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
-        //}
-        // prepare boundaries for communication
-        int i = tid * 6;
-        boundaries[i + 0] = aa[ind];
-        boundaries[i + 1] = aa[ind + sys_size - 1];
-        boundaries[i + 2] = cc[ind];
-        boundaries[i + 3] = cc[ind + sys_size - 1];
-        boundaries[i + 4] = dd[ind];
-        boundaries[i + 5] = dd[ind + sys_size - 1];*/
       }
     } else {
       //
@@ -760,18 +667,60 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
         }
       } else {
         if(INC) {
-          u[ind] += dd0;
+          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+          load_array_reg8_double2(u,&l_u,n, woffset, sys_size);
           
-          for(int i = 1; i < sys_size - 1; i++) {
-            u[ind + i] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          l_u.f[0] += dd0;
+          
+          for(int i = 1; i < VEC; i++) {
+            l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+          }
+          
+          store_array_reg8_double2(u,&l_u,n, woffset, sys_size);
+          
+          for(n = VEC; n < sys_size - VEC; n += VEC) {
+            load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+            load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+            load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+            load_array_reg8_double2(u,&l_u,n, woffset, sys_size);
+            for(int i = 0; i < VEC; i++) {
+              l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+            }
+            store_array_reg8_double2(u,&l_u,n, woffset, sys_size);
+          }
+          
+          for(; n < sys_size - 1; n++) {
+            u[ind + n] += dd[ind + n] - aa[ind + n] * dd0 - cc[ind + n] * ddn;
           }
           
           u[ind + sys_size - 1] += ddn;
         } else {
-          d[ind] = dd0;
+          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
           
-          for(int i = 1; i < sys_size - 1; i++) {
-            d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          l_d.f[0] = dd0;
+          
+          for(int i = 1; i < VEC; i++) {
+            l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+          }
+          
+          store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+          
+          for(n = VEC; n < sys_size - VEC; n += VEC) {
+            load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+            load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+            load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+            for(int i = 0; i < VEC; i++) {
+              l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+            }
+            store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+          }
+          
+          for(; n < sys_size - 1; n++) {
+            d[ind + n] = dd[ind + n] - aa[ind + n] * dd0 - cc[ind + n] * ddn;
           }
           
           d[ind + sys_size - 1] = ddn;
