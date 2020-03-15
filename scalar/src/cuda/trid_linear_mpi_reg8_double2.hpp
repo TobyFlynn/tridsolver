@@ -390,7 +390,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         int sys_off   = ind - ind_floor;
         
         // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
-        for(int n = 0; n < VEC * 2; n++) {
+        for(n = 0; n < VEC * 2; n++) {
           if(n >= sys_off) {
             int loc_ind = ind_floor + n;
             if(n - sys_off < 2) {
