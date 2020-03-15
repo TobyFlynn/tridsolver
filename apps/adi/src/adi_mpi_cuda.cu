@@ -189,16 +189,6 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     if(strcmp((char*)options[opt_index].name,"prof") == 0) prof = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"help") == 0) print_help();
   }
-
-  cudaSafeCall( cudaDeviceReset() );
-  cutilDeviceInit(argc, argv);
-  cudaSafeCall( cudaSetDevice(devid) );
-
-  #if FPPREC == 0
-    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeFourByte);
-  #elif FPPREC == 1
-    cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
-  #endif
   
   app.size_g = (int *) calloc(3, sizeof(int));
   app.size = (int *) calloc(3, sizeof(int));
@@ -218,6 +208,11 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   int *periodic = (int *) calloc(3, sizeof(int)); //false
   app.coords   = (int *) calloc(3, sizeof(int));
   MPI_Dims_create(procs, 3, app.pdims);
+  
+  devid = rank % 4;
+  cudaSafeCall( cudaSetDevice(devid) );
+  cutilDeviceInit(argc, argv);
+  cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
   
   // Create cartecian mpi comm
   MPI_Cart_create(MPI_COMM_WORLD, 3, app.pdims, periodic, 0,  &app.comm);
