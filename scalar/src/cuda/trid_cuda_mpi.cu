@@ -195,7 +195,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                 recv_buf, comm_buf_size, real_datatype,
                 params.communicators[solvedim]);
   
-  thomas_on_reduced_batched<REAL>(receive_buf, boundaries, sys_n, 
+  thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n, 
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g);
 
