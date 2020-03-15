@@ -409,10 +409,10 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         
         // Back to normal
         for(; n < sys_size - VEC; n += VEC) {
-          load_array_reg8_double2_unaligned(a, &l_a, n, tid, sys_size, sys_size);
-          load_array_reg8_double2_unaligned(b, &l_b, n, tid, sys_size, sys_size);
-          load_array_reg8_double2_unaligned(c, &l_c, n, tid, sys_size, sys_size);
-          load_array_reg8_double2_unaligned(d, &l_d, n, tid, sys_size, sys_size);
+          load_array_reg8_double2_unaligned(a, &l_a, n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(b, &l_b, n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(c, &l_c, n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(d, &l_d, n, tid, sys_pads, sys_size);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
             bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
@@ -423,9 +423,9 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
             l_aa.f[i] = a2;
             l_cc.f[i] = c2;
           }
-          store_array_reg8_double2_unaligned(dd, &l_dd, n, tid, sys_size, sys_size);
-          store_array_reg8_double2_unaligned(cc, &l_cc, n, tid, sys_size, sys_size);
-          store_array_reg8_double2_unaligned(aa, &l_aa, n, tid, sys_size, sys_size);
+          store_array_reg8_double2_unaligned(dd, &l_dd, n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(cc, &l_cc, n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(aa, &l_aa, n, tid, sys_pads, sys_size);
         }
         
         // Handle end of unaligned memory
@@ -634,7 +634,7 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
           u[ind] += dd0;
           
           for(int i = 1; i < sys_size - 1; i++) {
-            u[ind + 1] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+            u[ind + i] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
           }
           
           u[ind + sys_size - 1] += ddn;
@@ -642,7 +642,7 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
           d[ind] = dd0;
           
           for(int i = 1; i < sys_size - 1; i++) {
-            d[ind + 1] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+            d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
           }
           
           d[ind + sys_size - 1] = ddn;
@@ -653,7 +653,7 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
         u[ind] += dd0;
         
         for(int i = 1; i < sys_size - 1; i++) {
-          u[ind + 1] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          u[ind + i] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
         }
         
         u[ind + sys_size - 1] += ddn;
@@ -661,7 +661,7 @@ trid_linear_backward(const double *__restrict__ aa, const double *__restrict__ c
         d[ind] = dd0;
         
         for(int i = 1; i < sys_size - 1; i++) {
-          d[ind + 1] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
         }
         
         d[ind + sys_size - 1] = ddn;
