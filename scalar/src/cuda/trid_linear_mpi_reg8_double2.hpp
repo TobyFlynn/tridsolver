@@ -470,7 +470,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
             a2 = l_aa.f[i] - l_cc.f[i] * a2;
             c2 = -l_cc.f[i] * c2;
-            l_dd.f[i] = d2;n = sys_size - (2*VEC)
+            l_dd.f[i] = d2;
             l_cc.f[i] = c2;
             l_aa.f[i] = a2;
           }
