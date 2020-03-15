@@ -436,7 +436,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         }
         
         for(int i = n; i < sys_size; i++) {
-          int loc_ind = ind_floor + i;
+          int loc_ind = ind + i;
           bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
           dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
