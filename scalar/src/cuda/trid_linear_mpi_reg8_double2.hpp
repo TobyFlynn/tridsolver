@@ -384,7 +384,66 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
         boundaries[i + 5] = dd[ind + sys_size - 1];
       } else {
         
-        // Deal with first elements separately due to not being aligned
+        // Process first vector separately
+        load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
+        load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
+        load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
+        load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+        
+        for (int i = 0; i < 2; i++) {
+          bb = 1.0 / l_b.f[i];
+          d2 = bb * l_d.f[i];
+          a2 = bb * l_a.f[i];
+          c2 = bb * l_c.f[i];
+          l_dd.f[i] = d2;
+          l_aa.f[i] = a2;
+          l_cc.f[i] = c2;
+        }
+        
+        for(int i = 2; i < VEC; i++) {
+          bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
+          d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
+          a2 = (-l_a.f[i] * a2) * bb;
+          c2 = l_c.f[i] * bb;
+          l_dd.f[i] = d2;
+          l_aa.f[i] = a2;
+          l_cc.f[i] = c2;
+        }
+        
+        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        
+        // Forward pass
+        for(n = VEC; n < sys_size - VEC; n += VEC) {
+          load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
+          load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
+          load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
+          load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+          #pragma unroll 16
+          for(int i=0; i<VEC; i++) {
+            bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
+            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
+            a2 = (-l_a.f[i] * a2) * bb;
+            c2 = l_c.f[i] * bb;
+            l_dd.f[i] = d2;
+            l_aa.f[i] = a2;
+            l_cc.f[i] = c2;
+          }
+          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
+          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        }
+        
+        for(int i = n; i < sys_size; i++) {
+          int loc_ind = ind_floor + i;
+          bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+          dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
+          aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
+          cc[loc_ind] = c[loc_ind] * bb;
+        }
+        
+        /*// Deal with first elements separately due to not being aligned
         
         int ind_floor = (ind/VEC)*VEC;
         int sys_off   = ind - ind_floor;
@@ -435,7 +494,7 @@ trid_linear_forward(const double *__restrict__ a, const double *__restrict__ b,
           dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
           cc[loc_ind] = c[loc_ind] * bb;
-        }
+        }*/
         
         /*//
         // forward pass
