@@ -38,7 +38,8 @@
 
 #include "trid_linear_mpi_reg8_double2.hpp"
 #include "trid_linear_mpi.hpp"
-#include "trid_strided_multidim_mpi_pcr.hpp"
+//#include "trid_strided_multidim_mpi_pcr.hpp"
+#include "trid_strided_multidim_mpi.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
 #include "cutil_inline.h"
@@ -108,55 +109,6 @@ void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
   cudaSafeCall( cudaFree(dd_r) );
 }
 
-template <typename REAL>
-void thomas_on_reduced_batched_split(const REAL *receive_buf, REAL *results,
-                               int sys_n, int num_proc, int mpi_coord, int reducedSysLen, 
-                               int split_factor) {
-  const int reducedSize = reducedSysLen * sys_n;
-  
-  std::vector<REAL> h_aa_r(reducedSize), h_cc_r(reducedSize), h_dd_r(reducedSize);
-
-  REAL *aa_r, *cc_r, *dd_r;
-  cudaSafeCall( cudaMalloc(&aa_r, reducedSize * sizeof(REAL)) );
-  cudaSafeCall( cudaMalloc(&cc_r, reducedSize * sizeof(REAL)) );
-  cudaSafeCall( cudaMalloc(&dd_r, reducedSize * sizeof(REAL)) );
-
-  #pragma omp parallel for
-  for (size_t eq_idx = 0; eq_idx < sys_n; ++eq_idx) {
-    // The offset in the send and receive buffers
-    const size_t buf_offset = eq_idx * split_factor * 2 * 3;
-    const size_t buf_size = split_factor * 2 * 3 * sys_n;
-    for (int i = 0; i < num_proc; ++i) {
-      for (int j = 0; j < split_factor; j++) {
-        h_aa_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 0];
-        h_aa_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 1];
-        h_cc_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 2];
-        h_cc_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 3];
-        h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j)]     = receive_buf[buf_size * i + buf_offset + j * 6 + 4];
-        h_dd_r[eq_idx * reducedSysLen + (2 * split_factor * i + 2 * j + 1)] = receive_buf[buf_size * i + buf_offset + j * 6 + 5];
-      }
-    }
-  }
-  
-  cudaSafeCall( cudaMemcpy(aa_r, h_aa_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
-  cudaSafeCall( cudaMemcpy(cc_r, h_cc_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
-  cudaSafeCall( cudaMemcpy(dd_r, h_dd_r.data(), sizeof(REAL) * reducedSize, cudaMemcpyHostToDevice) );
-
-  // Call PCR
-  int P = (int) ceil(log2((REAL)reducedSysLen));
-  int numBlocks = sys_n;
-  int numThreads =  reducedSysLen;
-  pcr_on_reduced_kernel_split<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, results, split_factor, 
-                                                         mpi_coord, reducedSysLen, P);
-  
-  cudaSafeCall( cudaPeekAtLastError() );
-  cudaSafeCall( cudaDeviceSynchronize() );
-
-  cudaSafeCall( cudaFree(aa_r) );
-  cudaSafeCall( cudaFree(cc_r) );
-  cudaSafeCall( cudaFree(dd_r) );
-}
-
 template <typename REAL, int INC>
 void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                int *a_pads, const REAL *b, int *b_pads,
@@ -194,30 +146,6 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   
   int reduced_len_g;
   int reduced_len_l;
-  /*if(solvedim == 0) {
-    // Calculate the minimum length of reduced systems possible
-    const int min_reduced_len_g = 2 * params.num_mpi_procs[solvedim];
-    // Set the reduced system length to this minimum
-    reduced_len_g = min_reduced_len_g;
-    
-    // If replacing MAX_REDUCED_LEN with number based on memory size in future, then 
-    // should throw error if min_reduced_len > MAX_REDUCED_LEN
-    // See if length of reduced system can be increased.
-    if(reduced_len_g < MAX_REDUCED_LEN) {
-      if(dims_g[solvedim] / MIN_TRID_LEN > 1) {
-        if(reduced_len_g * (dims_g[solvedim] / MIN_TRID_LEN) > MAX_REDUCED_LEN) {
-          reduced_len_g = (MAX_REDUCED_LEN / min_reduced_len_g) * min_reduced_len_g;
-        } else {
-          reduced_len_g *= (dims_g[solvedim] / MIN_TRID_LEN);
-        }
-      }
-    }
-    
-    reduced_len_l = reduced_len_g / params.num_mpi_procs[solvedim];
-  } else {
-    reduced_len_g = 2 * params.num_mpi_procs[solvedim];
-    reduced_len_l = 2;
-  }*/
   
   reduced_len_g = 2 * params.num_mpi_procs[solvedim];
   reduced_len_l = 2;
@@ -228,20 +156,10 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaMalloc(&cc, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
-
-  //int trid_split_factor = reduced_len_l / 2;
-  int total_trids;
-  /*if(solvedim == 0) {
-    total_trids = sys_n * trid_split_factor;
-  } else {
-    total_trids = sys_n;
-  }*/
-  
-  total_trids = sys_n;
   
   int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
   int blockdimy = 1;
-  int dimgrid = 1 + (total_trids - 1) / blockdimx; // can go up to 65535
+  int dimgrid = 1 + (sys_n - 1) / blockdimx; // can go up to 65535
   int dimgridx = dimgrid % 65536;            // can go up to max 65535 on Fermi
   int dimgridy = 1 + dimgrid / 65536;
 
@@ -258,8 +176,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       // TODO
     }
   } else {
+    DIM_V pads, dims; // TODO
+    for (int i = 0; i < ndim; ++i) {
+      pads.v[i] = a_pads[i];
+      dims.v[i] = a_pads[i];
+    }
+    
+    /*trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
+        a, b, c, d, aa, cc, dd, boundaries, solvedim, sys_n, d_dims);*/
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
-        a, b, c, d, aa, cc, dd, boundaries, solvedim, sys_n, d_dims);
+        a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
+        ndim, solvedim, sys_n, dims);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
@@ -276,16 +203,9 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                 receive_buf.data(), comm_buf_size, real_datatype,
                 params.communicators[solvedim]);
   
-  // solve reduced systems, and store results directly in boundaries array on GPU
-  /*if(solvedim == 0) {
-    thomas_on_reduced_batched_split<REAL>(receive_buf.data(), boundaries, sys_n, 
-                                    params.num_mpi_procs[solvedim],
-                                    params.mpi_coords[solvedim], reduced_len_g, trid_split_factor);
-  } else {*/
-    thomas_on_reduced_batched<REAL>(receive_buf.data(), boundaries, sys_n, 
+  thomas_on_reduced_batched<REAL>(receive_buf.data(), boundaries, sys_n, 
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g);
-  //}
 
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
@@ -297,8 +217,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       // TODO
     }
   } else {
+    DIM_V pads, dims; // TODO
+    for (int i = 0; i < ndim; ++i) {
+      pads.v[i] = a_pads[i];
+      dims.v[i] = a_pads[i];
+    }
+    
+    /*trid_strided_multidim_backward<REAL, INC>
+        <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u, boundaries, solvedim, sys_n, d_dims);*/
     trid_strided_multidim_backward<REAL, INC>
-        <<<dimGrid_x, dimBlock_x>>>(aa, cc, dd, d, u, boundaries, solvedim, sys_n, d_dims);
+        <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
+                                    boundaries, ndim, solvedim, sys_n, dims);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
