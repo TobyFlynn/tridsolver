@@ -38,8 +38,6 @@
 #include <float.h>
 #include <sys/time.h>
 
-#define FP double
-
 #include "trid_mpi_cuda.hpp"
 #include "trid_mpi_solver_params.hpp"
 #include "trid_common.h"
@@ -376,8 +374,11 @@ int main(int argc, char* argv[]) {
     // perform tri-diagonal solves in x-direction
     //
     timing_start(&timer);
-    
+#if FPPREC == 0
+    tridSmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size, app.size_g);
+#else
     tridDmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 0, app.size, app.size, app.size_g);
+#endif
     
     timing_end(&timer, &elapsed_trid_x);
 
@@ -385,8 +386,11 @@ int main(int argc, char* argv[]) {
     // perform tri-diagonal solves in y-direction
     //
     timing_start(&timer);
-
+#if FPPREC == 0
+    tridSmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size, app.size_g);
+#else
     tridDmtsvStridedBatchMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 1, app.size, app.size, app.size_g);
+#endif
     
     timing_end(&timer, &elapsed_trid_y);
 
@@ -394,8 +398,11 @@ int main(int argc, char* argv[]) {
     // perform tri-diagonal solves in z-direction
     //
     timing_start(&timer);
-    
+#if FPPREC == 0
+    tridSmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size, app.size_g);
+#else
     tridDmtsvStridedBatchIncMPI(*(app.params), app.a, app.b, app.c, app.d, app.u, 3, 2, app.size, app.size, app.size_g);
+#endif
     
     timing_end(&timer, &elapsed_trid_z);
   }
