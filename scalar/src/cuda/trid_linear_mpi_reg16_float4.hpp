@@ -36,7 +36,7 @@
 #ifndef TRID_LINEAR_MPI_REG16_FLOAT4_GPU_MPI__
 #define TRID_LINEAR_MPI_REG16_FLOAT4_GPU_MPI__
 
-#define VEC 16 
+#define VEC_F 16 
 #define WARP_SIZE 32
 
 #include <assert.h>
@@ -46,8 +46,8 @@
 #include "cuda_shfl.h"
 
 typedef union {
-  float4 vec[VEC/4];
-  float  f[VEC];
+  float4 vec[VEC_F/4];
+  float  f[VEC_F];
 } float16;
 
 // transpose4x4xor() - exchanges data between 4 consecutive threads 
@@ -178,10 +178,9 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
   // A thread is active only if it works on valid memory
   const int active_thread   = optimized_solve || boundary_solve;
   // Check if aligned memory 
-  const int aligned         = (sys_pads % VEC) == 0;
+  const int aligned         = (sys_pads % VEC_F) == 0;
   
   int n = 0;
-  int b_ind = tid * 6;
   int ind = sys_pads * tid;
   
   float16 l_a, l_b, l_c, l_d, l_aa, l_cc, l_dd;
@@ -206,7 +205,7 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
           l_cc.f[i] = c2;
         }
         
-        for(int i = 2; i < VEC; i++) {
+        for(int i = 2; i < VEC_F; i++) {
           bb = 1.0f / (l_b.f[i] - l_a.f[i] * c2);
           d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
           a2 = (-l_a.f[i] * a2) * bb;
@@ -221,13 +220,13 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
         store_array_reg16(aa,&l_aa,n, woffset, sys_size);
         
         // Forward pass
-        for(n = VEC; n < sys_size; n += VEC) {
+        for(n = VEC_F; n < sys_size; n += VEC_F) {
           load_array_reg16(a,&l_a,n, woffset, sys_size);
           load_array_reg16(b,&l_b,n, woffset, sys_size);
           load_array_reg16(c,&l_c,n, woffset, sys_size);
           load_array_reg16(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
+          for(int i=0; i<VEC_F; i++) {
             bb = 1.0f / (l_b.f[i] - l_a.f[i] * c2);
             d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
             a2 = (-l_a.f[i] * a2) * bb;
@@ -241,17 +240,17 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
           store_array_reg16(aa,&l_aa,n, woffset, sys_size);
         }
         
-        n = sys_size - VEC;
+        n = sys_size - VEC_F;
         
         load_array_reg16(aa,&l_aa,n, woffset, sys_size);
         load_array_reg16(cc,&l_cc,n, woffset, sys_size);
         load_array_reg16(dd,&l_dd,n, woffset, sys_size);
         
-        a2 = l_aa.f[VEC - 2];
-        c2 = l_cc.f[VEC - 2];
-        d2 = l_dd.f[VEC - 2];
+        a2 = l_aa.f[VEC_F - 2];
+        c2 = l_cc.f[VEC_F - 2];
+        d2 = l_dd.f[VEC_F - 2];
         
-        for(int i = VEC - 3; i >= 0; i--) {
+        for(int i = VEC_F - 3; i >= 0; i--) {
           d2 = l_dd.f[i] - l_cc.f[i] * d2;
           a2 = l_aa.f[i] - l_cc.f[i] * a2;
           c2 = -l_cc.f[i] * c2;
@@ -264,12 +263,12 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
         store_array_reg16(cc,&l_cc,n, woffset, sys_size);
         store_array_reg16(aa,&l_aa,n, woffset, sys_size);
         
-        for(n = sys_size - (2*VEC); n > 0; n -= VEC) {
+        for(n = sys_size - (2*VEC_F); n > 0; n -= VEC_F) {
           load_array_reg16(aa,&l_aa,n, woffset, sys_size);
           load_array_reg16(cc,&l_cc,n, woffset, sys_size);
           load_array_reg16(dd,&l_dd,n, woffset, sys_size);
           
-          for(int i = VEC - 1; i >= 0; i--) {
+          for(int i = VEC_F - 1; i >= 0; i--) {
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
             a2 = l_aa.f[i] - l_cc.f[i] * a2;
             c2 = -l_cc.f[i] * c2;
@@ -289,7 +288,7 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
         load_array_reg16(cc,&l_cc,n, woffset, sys_size);
         load_array_reg16(dd,&l_dd,n, woffset, sys_size);
         
-        for(int i = VEC - 1; i > 0; i--) {
+        for(int i = VEC_F - 1; i > 0; i--) {
           d2 = l_dd.f[i] - l_cc.f[i] * d2;
           a2 = l_aa.f[i] - l_cc.f[i] * a2;
           c2 = -l_cc.f[i] * c2;
@@ -333,7 +332,7 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
           l_cc.f[i] = c2;
         }
         
-        for(int i = 2; i < VEC; i++) {
+        for(int i = 2; i < VEC_F; i++) {
           bb = 1.0f / (l_b.f[i] - l_a.f[i] * c2);
           d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
           a2 = (-l_a.f[i] * a2) * bb;
@@ -348,13 +347,13 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
         store_array_reg16(aa,&l_aa,n, woffset, sys_size);
         
         // Forward pass
-        for(n = VEC; n < sys_size - VEC; n += VEC) {
+        for(n = VEC_F; n < sys_size - VEC_F; n += VEC_F) {
           load_array_reg16(a,&l_a,n, woffset, sys_size);
           load_array_reg16(b,&l_b,n, woffset, sys_size);
           load_array_reg16(c,&l_c,n, woffset, sys_size);
           load_array_reg16(d,&l_d,n, woffset, sys_size);
           #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
+          for(int i=0; i<VEC_F; i++) {
             bb = 1.0f / (l_b.f[i] - l_a.f[i] * c2);
             d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
             a2 = (-l_a.f[i] * a2) * bb;
@@ -378,13 +377,13 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
           cc[loc_ind] = c[loc_ind] * bb;
         }
         
-        n -= VEC;
+        n -= VEC_F;
         
         a2 = aa[ind + sys_size - 2];
         c2 = cc[ind + sys_size - 2];
         d2 = dd[ind + sys_size - 2];
         
-        for(int i = sys_size - 3; i >= n + VEC; i--) {
+        for(int i = sys_size - 3; i >= n + VEC_F; i--) {
           int loc_ind = ind + i;
           d2 = dd[loc_ind] - cc[loc_ind] * d2;
           a2 = aa[loc_ind] - cc[loc_ind] * a2;
@@ -394,12 +393,12 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
           cc[loc_ind] = c2;
         }
         
-        for(; n > 0; n -= VEC) {
+        for(; n > 0; n -= VEC_F) {
           load_array_reg16(aa,&l_aa,n, woffset, sys_size);
           load_array_reg16(cc,&l_cc,n, woffset, sys_size);
           load_array_reg16(dd,&l_dd,n, woffset, sys_size);
           
-          for(int i = VEC - 1; i >= 0; i--) {
+          for(int i = VEC_F - 1; i >= 0; i--) {
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
             a2 = l_aa.f[i] - l_cc.f[i] * a2;
             c2 = -l_cc.f[i] * c2;
@@ -419,7 +418,7 @@ trid_linear_forward_float(const float *__restrict__ a, const float *__restrict__
         load_array_reg16(cc,&l_cc,n, woffset, sys_size);
         load_array_reg16(dd,&l_dd,n, woffset, sys_size);
         
-        for(int i = VEC - 1; i > 0; i--) {
+        for(int i = VEC_F - 1; i > 0; i--) {
           d2 = l_dd.f[i] - l_cc.f[i] * d2;
           a2 = l_aa.f[i] - l_cc.f[i] * a2;
           c2 = -l_cc.f[i] * c2;
@@ -512,7 +511,7 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
   // A thread is active only if it works on valid memory
   const int active_thread   = optimized_solve || boundary_solve;
   // Check if aligned memory 
-  const int aligned         = (sys_pads % VEC) == 0;
+  const int aligned         = (sys_pads % VEC_F) == 0;
   
   int n = 0;
   int ind = sys_pads * tid;
@@ -532,34 +531,34 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
           
           l_u.f[0] += dd0;
           
-          for(int i = 1; i < VEC; i++) {
+          for(int i = 1; i < VEC_F; i++) {
             l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
           store_array_reg16(u,&l_u,n, woffset, sys_size);
           
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
+          for(n = VEC_F; n < sys_size - VEC_F; n += VEC_F) {
             load_array_reg16(aa,&l_aa,n, woffset, sys_size);
             load_array_reg16(cc,&l_cc,n, woffset, sys_size);
             load_array_reg16(dd,&l_dd,n, woffset, sys_size);
             load_array_reg16(u,&l_u,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
+            for(int i = 0; i < VEC_F; i++) {
               l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
             }
             store_array_reg16(u,&l_u,n, woffset, sys_size);
           }
           
-          n = sys_size - VEC;
+          n = sys_size - VEC_F;
           load_array_reg16(aa,&l_aa,n, woffset, sys_size);
           load_array_reg16(cc,&l_cc,n, woffset, sys_size);
           load_array_reg16(dd,&l_dd,n, woffset, sys_size);
           load_array_reg16(u,&l_u,n, woffset, sys_size);
           
-          for(int i = 0; i < VEC - 1; i++) {
+          for(int i = 0; i < VEC_F - 1; i++) {
             l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
-          l_u.f[VEC - 1] += ddn;
+          l_u.f[VEC_F - 1] += ddn;
           
           store_array_reg16(u,&l_u,n, woffset, sys_size);
         } else {
@@ -569,32 +568,32 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
           
           l_d.f[0] = dd0;
           
-          for(int i = 1; i < VEC; i++) {
+          for(int i = 1; i < VEC_F; i++) {
             l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
           store_array_reg16(d,&l_d,n, woffset, sys_size);
           
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
+          for(n = VEC_F; n < sys_size - VEC_F; n += VEC_F) {
             load_array_reg16(aa,&l_aa,n, woffset, sys_size);
             load_array_reg16(cc,&l_cc,n, woffset, sys_size);
             load_array_reg16(dd,&l_dd,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
+            for(int i = 0; i < VEC_F; i++) {
               l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
             }
             store_array_reg16(d,&l_d,n, woffset, sys_size);
           }
           
-          n = sys_size - VEC;
+          n = sys_size - VEC_F;
           load_array_reg16(aa,&l_aa,n, woffset, sys_size);
           load_array_reg16(cc,&l_cc,n, woffset, sys_size);
           load_array_reg16(dd,&l_dd,n, woffset, sys_size);
           
-          for(int i = 0; i < VEC - 1; i++) {
+          for(int i = 0; i < VEC_F - 1; i++) {
             l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
-          l_d.f[VEC - 1] = ddn;
+          l_d.f[VEC_F - 1] = ddn;
           
           store_array_reg16(d,&l_d,n, woffset, sys_size);
         }
@@ -607,18 +606,18 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
           
           l_u.f[0] += dd0;
           
-          for(int i = 1; i < VEC; i++) {
+          for(int i = 1; i < VEC_F; i++) {
             l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
           store_array_reg16(u,&l_u,n, woffset, sys_size);
           
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
+          for(n = VEC_F; n < sys_size - VEC_F; n += VEC_F) {
             load_array_reg16(aa,&l_aa,n, woffset, sys_size);
             load_array_reg16(cc,&l_cc,n, woffset, sys_size);
             load_array_reg16(dd,&l_dd,n, woffset, sys_size);
             load_array_reg16(u,&l_u,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
+            for(int i = 0; i < VEC_F; i++) {
               l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
             }
             store_array_reg16(u,&l_u,n, woffset, sys_size);
@@ -636,17 +635,17 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
           
           l_d.f[0] = dd0;
           
-          for(int i = 1; i < VEC; i++) {
+          for(int i = 1; i < VEC_F; i++) {
             l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
           }
           
           store_array_reg16(d,&l_d,n, woffset, sys_size);
           
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
+          for(n = VEC_F; n < sys_size - VEC_F; n += VEC_F) {
             load_array_reg16(aa,&l_aa,n, woffset, sys_size);
             load_array_reg16(cc,&l_cc,n, woffset, sys_size);
             load_array_reg16(dd,&l_dd,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
+            for(int i = 0; i < VEC_F; i++) {
               l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
             }
             store_array_reg16(d,&l_d,n, woffset, sys_size);
