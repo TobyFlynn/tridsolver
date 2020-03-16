@@ -67,8 +67,8 @@ void thomas_on_reduced_batched(REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
   // Call PCR
   int P = (int) ceil(log2((REAL)reducedSysLen));
-  int numBlocks = sys_n;
-  int numThreads =  reducedSysLen;
+  int numThreads =  128;
+  int numBlocks = (int) ceil((REAL)(sys_n * reducedSysLen) / (REAL)numThreads);
   
   pcr_on_reduced_kernel_no_preproc<REAL><<<numBlocks, numThreads>>>(receive_buf, results, 
                                                          mpi_coord, reducedSysLen, P, sys_n);

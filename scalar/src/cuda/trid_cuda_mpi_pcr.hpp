@@ -119,8 +119,12 @@ template<typename REAL>
 __global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results, 
                                       const int mpi_coord, const int n, const int P, 
                                       const int sys_n) {
-  int tridNum = blockIdx.x;
-  int i = threadIdx.x;
+  const int tid = threadIdx.x + threadIdx.y * blockDim.x +
+                  blockIdx.x * blockDim.y * blockDim.x +
+                  blockIdx.y * gridDim.x * blockDim.y * blockDim.x;
+  
+  int tridNum = (tid / 2) % sys_n;
+  int i = ((tid / 2) / sys_n) * 2 + (tid % 2);
   
   int a_ind = (6 * sys_n * (i / 2)) + (tridNum * 6) + (i % 2);
   int c_ind = (6 * sys_n * (i / 2)) + (tridNum * 6) + 2 + (i % 2);
