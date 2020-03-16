@@ -115,4 +115,74 @@ __global__ void pcr_on_reduced_kernel_preproc(const REAL* input, REAL *a, REAL *
   }
 }
 
+template<typename REAL>
+__global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results, 
+                                      const int mpi_coord, const int n, const int P) {
+  int tridNum = blockIdx.x;
+  int i = threadIdx.x;
+  
+  int a_ind = (6 * n * (i / 2)) + (tridNum * 6) + (i % 2);
+  int c_ind = (6 * n * (i / 2)) + (tridNum * 6) + 2 + (i % 2);
+  int d_ind = (6 * n * (i / 2)) + (tridNum * 6) + 4 + (i % 2);
+
+  if(i >= n) {
+
+    for(int p = 0; p < P; p++) {
+      __syncthreads();
+      __syncthreads();
+    }
+    
+    return;
+  }
+  
+  REAL a_m, a_p, c_m, c_p, d_m, d_p;
+
+  int s = 1;
+  
+  for(int p = 0; p < P; p++) {
+    if(i - s < 0) {
+      a_m = (REAL) 0.0;
+      c_m = (REAL) 0.0;
+      d_m = (REAL) 0.0;
+    } else {
+      int a_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + ((i - s) % 2);
+      a_m = input[a_m_ind];
+      int c_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + 2 + ((i - s) % 2);
+      c_m = input[c_m_ind];
+      int d_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + 4 + ((i - s) % 2);
+      d_m = input[d_m_ind];
+    }
+    
+    if(i + s >= n) {
+      a_p = (REAL) 0.0;
+      c_p = (REAL) 0.0;
+      d_p = (REAL) 0.0;
+    } else {
+      int a_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + ((i + s) % 2);
+      a_p = input[a_p_ind];
+      int c_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + 2 + ((i + s) % 2);
+      c_p = input[c_p_ind];
+      int d_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + 4 + ((i + s) % 2);
+      d_p = input[d_p_ind];
+    }
+    
+    __syncthreads();
+    
+    REAL r = 1.0 - input[a_ind] * c_m - input[c_ind] * a_p;
+    r = 1.0 / r;
+    input[d_ind] = r * (input[d_ind] - input[a_ind] * d_m - input[c_ind] * d_p);
+    input[a_ind] = -r * input[a_ind] * a_m;
+    input[c_ind] = -r * input[c_ind] * c_p;
+    
+    __syncthreads();
+    
+    s = s << 1;
+  }
+  
+  if(i >= 2 * mpi_coord && i < 2 * (mpi_coord + 1)) {
+    int reduced_ind_l = i - (2 * mpi_coord);
+    results[2 * tridNum + reduced_ind_l] = input[d_ind];
+  }
+}
+
 #endif
