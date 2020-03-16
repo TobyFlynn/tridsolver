@@ -63,7 +63,7 @@
 // mpi_coord: index of the current process along the solving dimension
 //
 template <typename REAL>
-void thomas_on_reduced_batched(const REAL *receive_buf, REAL *results,
+void thomas_on_reduced_batched(REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
   const int reducedSize = reducedSysLen * sys_n;
 
