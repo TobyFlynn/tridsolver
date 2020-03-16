@@ -385,14 +385,20 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
             int loc_ind = ind_floor + i;
             if(i - sys_off < 2) {
               bb = 1.0 / b[loc_ind];
-              dd[loc_ind] = bb * d[loc_ind];
-              aa[loc_ind] = bb * a[loc_ind];
-              cc[loc_ind] = bb * c[loc_ind];
+              d2 = bb * d[loc_ind];
+              a2 = bb * a[loc_ind];
+              c2 = bb * c[loc_ind];
+              dd[loc_ind] = d2;
+              aa[loc_ind] = a2;
+              cc[loc_ind] = c2;
             } else {
-              bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-              dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-              aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-              cc[loc_ind] = c[loc_ind] * bb;
+              bb = 1.0 / (b[loc_ind] - a[loc_ind] * c2);
+              d2 = (d[loc_ind] - a[loc_ind] * d2) * bb;
+              a2 = (-a[loc_ind] * a2) * bb;
+              c2 = c[loc_ind] * bb;
+              dd[loc_ind] = d2;
+              aa[loc_ind] = a2;
+              cc[loc_ind] = c2;
             }
           }
         }
@@ -422,10 +428,13 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         // Handle end of unaligned memory
         for(int i = n; i < sys_size + sys_off; i++) {
           int loc_ind = ind_floor + i;
-          bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-          dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-          aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-          cc[loc_ind] = c[loc_ind] * bb;
+          bb = 1.0 / (b[loc_ind] - a[loc_ind] * c2);
+          d2 = (d[loc_ind] - a[loc_ind] * d2) * bb;
+          a2 = (-a[loc_ind] * a2) * bb;
+          c2 = c[loc_ind] * bb;
+          dd[loc_ind] = d2;
+          aa[loc_ind] = a2;
+          cc[loc_ind] = c2;
         }
         
         /*//
@@ -620,65 +629,7 @@ trid_linear_backward_double(const double *__restrict__ aa, const double *__restr
           store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
         }
       } else {
-        if(INC) {
-          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          load_array_reg8_double2(u,&l_u,n, woffset, sys_size);
-          
-          l_u.f[0] += dd0;
-          
-          for(int i = 1; i < VEC; i++) {
-            l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
-          }
-          
-          store_array_reg8_double2(u,&l_u,n, woffset, sys_size);
-          
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
-            load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-            load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-            load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-            load_array_reg8_double2(u,&l_u,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
-              l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
-            }
-            store_array_reg8_double2(u,&l_u,n, woffset, sys_size);
-          }
-          
-          for(; n < sys_size - 1; n++) {
-            u[ind + n] += dd[ind + n] - aa[ind + n] * dd0 - cc[ind + n] * ddn;
-          }
-          
-          u[ind + sys_size - 1] += ddn;
-        } else {
-          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          
-          l_d.f[0] = dd0;
-          
-          for(int i = 1; i < VEC; i++) {
-            l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
-          }
-          
-          store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
-          
-          for(n = VEC; n < sys_size - VEC; n += VEC) {
-            load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-            load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-            load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-            for(int i = 0; i < VEC; i++) {
-              l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
-            }
-            store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
-          }
-          
-          for(; n < sys_size - 1; n++) {
-            d[ind + n] = dd[ind + n] - aa[ind + n] * dd0 - cc[ind + n] * ddn;
-          }
-          
-          d[ind + sys_size - 1] = ddn;
-        }
+        // TODO
       }
     } else {
       if(INC) {
