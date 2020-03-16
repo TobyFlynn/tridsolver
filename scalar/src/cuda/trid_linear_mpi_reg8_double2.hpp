@@ -248,10 +248,10 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
     if(optimized_solve) {
       if(aligned) {
         // Process first vector separately
-        load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
-        load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
-        load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
-        load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+        load_array_reg8_double2(a,&l_a,n, woffset, sys_pads);
+        load_array_reg8_double2(b,&l_b,n, woffset, sys_pads);
+        load_array_reg8_double2(c,&l_c,n, woffset, sys_pads);
+        load_array_reg8_double2(d,&l_d,n, woffset, sys_pads);
         
         for (int i = 0; i < 2; i++) {
           bb = 1.0 / l_b.f[i];
@@ -273,16 +273,16 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
           l_cc.f[i] = c2;
         }
         
-        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
+        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
         
         // Forward pass
         for(n = VEC; n < sys_size - VEC; n += VEC) {
-          load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
-          load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
-          load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
-          load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
+          load_array_reg8_double2(a,&l_a,n, woffset, sys_pads);
+          load_array_reg8_double2(b,&l_b,n, woffset, sys_pads);
+          load_array_reg8_double2(c,&l_c,n, woffset, sys_pads);
+          load_array_reg8_double2(d,&l_d,n, woffset, sys_pads);
           #pragma unroll 16
           for(int i=0; i<VEC; i++) {
             bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
@@ -293,9 +293,9 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
             l_aa.f[i] = a2;
             l_cc.f[i] = c2;
           }
-          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
+          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
         }
         
         // Finish off last part that may not fill an entire vector
@@ -325,9 +325,9 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         }
         
         for(; n > 0; n -= VEC) {
-          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
+          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
           
           for(int i = VEC - 1; i >= 0; i--) {
             d2 = l_dd.f[i] - l_cc.f[i] * d2;
@@ -338,16 +338,16 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
             l_aa.f[i] = a2;
           }
           
-          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
+          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
         }
         
         n = 0;
         
-        load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
+        load_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
+        load_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+        load_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
         
         for(int i = VEC - 1; i > 0; i--) {
           d2 = l_dd.f[i] - l_cc.f[i] * d2;
@@ -363,9 +363,9 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         l_aa.f[0] = bb * l_aa.f[0];
         l_cc.f[0] = bb * (-l_cc.f[0] * c2);
         
-        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
+        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_pads);
+        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_pads);
+        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_pads);
         
         // prepare boundaries for communication
         int i = tid * 6;
@@ -379,7 +379,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         int ind_floor = (ind/ALIGN_DOUBLE)*ALIGN_DOUBLE;
         int sys_off   = ind - ind_floor;
         
-        // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
+        // Handle start of unaligned memory
         for(int i = 0; i < VEC; i++) {
           if(i >= sys_off) {
             int loc_ind = ind_floor + i;
@@ -437,6 +437,62 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
           cc[loc_ind] = c2;
         }
         
+        // Backwards pass
+        
+        d2 = dd[ind_floor + sys_size + sys_off - 2];
+        a2 = aa[ind_floor + sys_size + sys_off - 2];
+        c2 = cc[ind_floor + sys_size + sys_off - 2];
+        
+        // Start with end of unaligned memory
+        for(int i = sys_size + sys_off - 3; i >= n; i--) {
+          int loc_ind = ind_floor + i;
+          d2 = dd[loc_ind] - cc[loc_ind] * d2;
+          a2 = aa[loc_ind] - cc[loc_ind] * a2;
+          c2 = -cc[loc_ind] * c2;
+          dd[loc_ind] = d2;
+          aa[loc_ind] = a2;
+          cc[loc_ind] = c2;
+        }
+        
+        n -= VEC;
+        
+        // Back to normal
+        for(; n > 0; n -= VEC) {
+          load_array_reg8_double2_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+          
+          for(int i = VEC - 1; i >= 0; i--) {
+            d2 = l_dd.f[i] - l_cc.f[i] * d2;
+            a2 = l_aa.f[i] - l_cc.f[i] * a2;
+            c2 = -l_cc.f[i] * c2;
+            l_dd.f[i] = d2;
+            l_cc.f[i] = c2;
+            l_aa.f[i] = a2;
+          }
+          
+          store_array_reg8_double2_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
+        }
+        
+        for(int i = n + VEC - 1; i >= 0; i--) {
+          if(i - sys_off > 0) {
+            int loc_ind = ind_floor + i;
+            d2 = dd[loc_ind] - cc[loc_ind] * d2;
+            a2 = aa[loc_ind] - cc[loc_ind] * a2;
+            c2 = -cc[loc_ind] * c2;
+            dd[loc_ind] = d2;
+            aa[loc_ind] = a2;
+            cc[loc_ind] = c2;
+          } else if (i - sys_off == 0) {
+            bb = 1.0 / (1.0 - cc[ind] * a2);
+            dd[ind] = bb * (dd[ind] - cc[ind] * d2);
+            aa[ind] = bb * aa[ind];
+            cc[ind] = bb * (-cc[ind] * c2);
+          }
+        }
+        
         /*//
         // forward pass
         //
@@ -456,7 +512,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
             cc[loc_ind] = c[loc_ind] * bb;
           }*/
           // Eliminate upper off-diagonal
-          for (int i = sys_size - 3; i > 0; --i) {
+          /*for (int i = sys_size - 3; i > 0; --i) {
             int loc_ind = ind + i;
             dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
             aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
@@ -465,7 +521,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
           bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
           dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
           aa[ind] = bb * aa[ind];
-          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
+          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);*/
         //}
         // prepare boundaries for communication
         int i = tid * 6;
@@ -629,7 +685,23 @@ trid_linear_backward_double(const double *__restrict__ aa, const double *__restr
           store_array_reg8_double2(d,&l_d,n, woffset, sys_size);
         }
       } else {
-        // TODO
+        if(INC) {
+          u[ind] += dd0;
+          
+          for(int i = 1; i < sys_size - 1; i++) {
+            u[ind + i] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          }
+          
+          u[ind + sys_size - 1] += ddn;
+        } else {
+          d[ind] = dd0;
+          
+          for(int i = 1; i < sys_size - 1; i++) {
+            d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          }
+          
+          d[ind + sys_size - 1] = ddn;
+        }
       }
     } else {
       if(INC) {
