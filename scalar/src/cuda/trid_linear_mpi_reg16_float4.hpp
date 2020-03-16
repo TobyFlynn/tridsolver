@@ -641,18 +641,76 @@ trid_linear_backward_float(const float *__restrict__ aa, const float *__restrict
         }
       } else {
         if(INC) {
-          u[ind] += dd0;
+          int ind_floor = (ind/ALIGN_FLOAT)*ALIGN_FLOAT;
+          int sys_off   = ind - ind_floor;
           
-          for(int i = 1; i < sys_size - 1; i++) {
-            u[ind + i] += dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          // Handle start of unaligned memory
+          for(int i = 0; i < VEC_F; i++) {
+            if(i >= sys_off) {
+              int loc_ind = ind_floor + i;
+              if(i == sys_off) {
+                u[loc_ind] += dd0;
+              } else {
+                u[loc_ind] += dd[loc_ind] - aa[loc_ind] * dd0 - cc[loc_ind] * ddn;
+              }
+            }
+          }
+          
+          n = VEC_F;
+          // Back to normal
+          for(; n < sys_size - VEC_F; n += VEC_F) {
+            load_array_reg16_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(u,&l_u,n, tid, sys_pads, sys_size);
+            #pragma unroll 16
+            for(int i=0; i<VEC_F; i++) {
+              l_u.f[i] += l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+            }
+            store_array_reg16_unaligned(u,&l_u,n, tid, sys_pads, sys_size);
+          }
+          
+          // Handle end of unaligned memory
+          for(int i = n; i < sys_size + sys_off - 1; i++) {
+            int loc_ind = ind_floor + i;
+            u[loc_ind] += dd[loc_ind] - aa[loc_ind] * dd0 - cc[loc_ind] * ddn;
           }
           
           u[ind + sys_size - 1] += ddn;
         } else {
-          d[ind] = dd0;
+          int ind_floor = (ind/ALIGN_FLOAT)*ALIGN_FLOAT;
+          int sys_off   = ind - ind_floor;
           
-          for(int i = 1; i < sys_size - 1; i++) {
-            d[ind + i] = dd[ind + i] - aa[ind + i] * dd0 - cc[ind + i] * ddn;
+          // Handle start of unaligned memory
+          for(int i = 0; i < VEC_F; i++) {
+            if(i >= sys_off) {
+              int loc_ind = ind_floor + i;
+              if(i == sys_off) {
+                d[loc_ind] = dd0;
+              } else {
+                d[loc_ind] = dd[loc_ind] - aa[loc_ind] * dd0 - cc[loc_ind] * ddn;
+              }
+            }
+          }
+          
+          n = VEC;
+          // Back to normal
+          for(; n < sys_size - VEC_F; n += VEC_F) {
+            load_array_reg16_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+            load_array_reg16_unaligned(d,&l_d,n, tid, sys_pads, sys_size);
+            #pragma unroll 16
+            for(int i=0; i<VEC_F; i++) {
+              l_d.f[i] = l_dd.f[i] - l_aa.f[i] * dd0 - l_cc.f[i] * ddn;
+            }
+            store_array_reg16_unaligned(d,&l_d,n, tid, sys_pads, sys_size);
+          }
+          
+          // Handle end of unaligned memory
+          for(int i = n; i < sys_size + sys_off - 1; i++) {
+            int loc_ind = ind_floor + i;
+            d[loc_ind] = dd[loc_ind] - aa[loc_ind] * dd0 - cc[loc_ind] * ddn;
           }
           
           d[ind + sys_size - 1] = ddn;
