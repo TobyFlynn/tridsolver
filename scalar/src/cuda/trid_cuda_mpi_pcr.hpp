@@ -117,13 +117,14 @@ __global__ void pcr_on_reduced_kernel_preproc(const REAL* input, REAL *a, REAL *
 
 template<typename REAL>
 __global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results, 
-                                      const int mpi_coord, const int n, const int P) {
+                                      const int mpi_coord, const int n, const int P, 
+                                      const int sys_n) {
   int tridNum = blockIdx.x;
   int i = threadIdx.x;
   
-  int a_ind = (6 * n * (i / 2)) + (tridNum * 6) + (i % 2);
-  int c_ind = (6 * n * (i / 2)) + (tridNum * 6) + 2 + (i % 2);
-  int d_ind = (6 * n * (i / 2)) + (tridNum * 6) + 4 + (i % 2);
+  int a_ind = (6 * sys_n * (i / 2)) + (tridNum * 6) + (i % 2);
+  int c_ind = (6 * sys_n * (i / 2)) + (tridNum * 6) + 2 + (i % 2);
+  int d_ind = (6 * sys_n * (i / 2)) + (tridNum * 6) + 4 + (i % 2);
 
   if(i >= n) {
 
@@ -145,11 +146,11 @@ __global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results,
       c_m = (REAL) 0.0;
       d_m = (REAL) 0.0;
     } else {
-      int a_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + ((i - s) % 2);
+      int a_m_ind = (6 * sys_n * ((i - s) / 2)) + (tridNum * 6) + ((i - s) % 2);
       a_m = input[a_m_ind];
-      int c_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + 2 + ((i - s) % 2);
+      int c_m_ind = (6 * sys_n * ((i - s) / 2)) + (tridNum * 6) + 2 + ((i - s) % 2);
       c_m = input[c_m_ind];
-      int d_m_ind = (6 * n * ((i - s) / 2)) + (tridNum * 6) + 4 + ((i - s) % 2);
+      int d_m_ind = (6 * sys_n * ((i - s) / 2)) + (tridNum * 6) + 4 + ((i - s) % 2);
       d_m = input[d_m_ind];
     }
     
@@ -158,11 +159,11 @@ __global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results,
       c_p = (REAL) 0.0;
       d_p = (REAL) 0.0;
     } else {
-      int a_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + ((i + s) % 2);
+      int a_p_ind = (6 * sys_n * ((i + s) / 2)) + (tridNum * 6) + ((i + s) % 2);
       a_p = input[a_p_ind];
-      int c_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + 2 + ((i + s) % 2);
+      int c_p_ind = (6 * sys_n * ((i + s) / 2)) + (tridNum * 6) + 2 + ((i + s) % 2);
       c_p = input[c_p_ind];
-      int d_p_ind = (6 * n * ((i + s) / 2)) + (tridNum * 6) + 4 + ((i + s) % 2);
+      int d_p_ind = (6 * sys_n * ((i + s) / 2)) + (tridNum * 6) + 4 + ((i + s) % 2);
       d_p = input[d_p_ind];
     }
     

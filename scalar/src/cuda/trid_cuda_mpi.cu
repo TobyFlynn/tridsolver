@@ -67,40 +67,16 @@ void thomas_on_reduced_batched(REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
   const int reducedSize = reducedSysLen * sys_n;
 
-  REAL *aa_r, *cc_r, *dd_r;
-  cudaSafeCall( cudaMalloc(&aa_r, reducedSize * sizeof(REAL)) );
-  cudaSafeCall( cudaMalloc(&cc_r, reducedSize * sizeof(REAL)) );
-  cudaSafeCall( cudaMalloc(&dd_r, reducedSize * sizeof(REAL)) );
-  
-  /*int blockdimx = 128; // Has to be the multiple of 4(or maybe 32??)
-  int blockdimy = 1;
-  int dimgrid = 1 + (sys_n - 1) / blockdimx; // can go up to 65535
-  int dimgridx = dimgrid % 65536;            // can go up to max 65535 on Fermi
-  int dimgridy = 1 + dimgrid / 65536;
-
-  dim3 dimGrid_x(dimgridx, dimgridy);
-  dim3 dimBlock_x(blockdimx, blockdimy);
-
-  pcr_on_reduced_kernel_preproc<<<dimGrid_x, dimBlock_x>>>(receive_buf, aa_r, cc_r, dd_r, 
-                                                           sys_n, num_proc, reducedSysLen);
-  cudaSafeCall( cudaPeekAtLastError() );
-  cudaSafeCall( cudaDeviceSynchronize() );*/
-
   // Call PCR
   int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
   int numThreads =  reducedSysLen;
-  /*pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(aa_r, cc_r, dd_r, results, 
-                                                         mpi_coord, reducedSysLen, P);*/
+  
   pcr_on_reduced_kernel_no_preproc<REAL><<<numBlocks, numThreads>>>(receive_buf, results, 
-                                                         mpi_coord, reducedSysLen, P);
+                                                         mpi_coord, reducedSysLen, P, sys_n);
   
   cudaSafeCall( cudaPeekAtLastError() );
   cudaSafeCall( cudaDeviceSynchronize() );
-
-  cudaSafeCall( cudaFree(aa_r) );
-  cudaSafeCall( cudaFree(cc_r) );
-  cudaSafeCall( cudaFree(dd_r) );
 }
 
 template <typename REAL, int INC>
