@@ -182,7 +182,6 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
   const int aligned         = (sys_pads % VEC) == 0;
   
   int n = 0;
-  int b_ind = tid * 6;
   int ind = sys_pads * tid;
   
   double8 l_a, l_b, l_c, l_d, l_aa, l_cc, l_dd;

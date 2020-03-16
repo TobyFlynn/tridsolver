@@ -36,7 +36,7 @@
 #ifndef TRID_LINEAR_MPI_REG16_FLOAT4_GPU_MPI__
 #define TRID_LINEAR_MPI_REG16_FLOAT4_GPU_MPI__
 
-#define VEC 8 
+#define VEC 16 
 #define WARP_SIZE 32
 
 #include <assert.h>
