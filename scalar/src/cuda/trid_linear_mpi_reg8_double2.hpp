@@ -126,12 +126,40 @@ inline __device__ void load_array_reg8_double2(const double* __restrict__ ga, do
   int i;
   //#pragma unroll(4)
   for(i=0; i<4; i++) {
-  //  (*la).vec[i] = *((double2*)&ga[gind]);
     (*la).vec[i] = __ldg( ((double2*)&ga[gind]) );
     gind += sys_pads;
   }
 
   transpose4x4xor(la);
+}
+
+// Same as load_array_reg8() with the following exception: if sys_pads would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
+// ga - global array
+// la - local array
+inline __device__ void load_array_reg8_double2_unaligned(double const* __restrict__ ga, double8* la, int n, int tid, int sys_pads, int sys_length) {
+  int gind; // Global memory index of an element
+  // Array indexing can be decided in compile time -> arrays will stay in registers
+  // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
+  //int trow = (threadIdx.x % 32)/ 4; // Threads' row index within a warp
+  int tcol = threadIdx.x % 4;       // Threads' colum index within a warp
+
+  // Load 4 double2 values (64bytes) from an X-line
+  //gind = (tid/4)*4 * sys_pads  + tcol*4 + n; // Global memory index for threads
+  gind = (tid/4)*4 * sys_pads  + n; // Global memory index for threads
+
+  int gind_floor;
+  //int ind;
+  int i;
+  for(i=0; i<4; i++) {
+    gind_floor   = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    //gind_floor   = (gind/4)*4; // Round index to floor
+    //(*la).vec[i] = *((double2*)&ga[gind_floor]);    // Get aligned data
+    (*la).vec[i] = __ldg( ((double2*)&ga[gind_floor]) );    // Get aligned data
+    gind        += sys_pads;                         // Stride to the next system
+  }
+
+  transpose4x4xor(la);
+
 }
 
 // Store a tile with 32x16 elements into 32 double8 struct allocated in registers. Every 4 consecutive threads cooperate to transpose and store a 4 x double2 sub-tile.
@@ -154,6 +182,35 @@ inline __device__ void store_array_reg8_double2(double* __restrict__ ga, double8
   *((double2*)&ga[gind]) = (*la).vec[2];
   gind += sys_pads;
   *((double2*)&ga[gind]) = (*la).vec[3];
+}
+
+// Same as store_array_reg8() with the following exception: if stride would cause unaligned access the index is rounded down to the its floor value to prevent missaligned access.
+// ga - global array
+// la - local array
+inline __device__ void store_array_reg8_double2_unaligned(double* __restrict__ ga, double8* __restrict__ la, int n, int tid, int sys_pads, int sys_length) {
+  int gind; // Global memory index of an element
+  // Array indexing can be decided in compile time -> arrays will stay in registers
+  // If trow and tcol are taken as an argument, they are not know in compile time -> no optimization
+  //int trow = (threadIdx.x % 32)/ 4; // Threads' row index within a warp
+  int tcol = threadIdx.x % 4;       // Threads' colum index within a warp
+
+  transpose4x4xor(la);
+
+  // Store 4 double2 values (64bytes) to an X-line
+  //gind = (tid/4)*4 * sys_pads  + tcol*4 + n; // Global memory index for threads
+  gind = (tid/4)*4 * sys_pads  + n; // Global memory index for threads
+
+  int gind_floor;
+  //int ind;
+  int i;
+  for(i=0; i<4; i++) {
+    //gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE ; // Round index to floor
+    gind_floor = (gind/ALIGN_DOUBLE)*ALIGN_DOUBLE + tcol*2; // Round index to floor
+    //gind_floor = (gind/4)*4; // Round index to floor double2
+    *((double2*)&ga[gind_floor]) = (*la).vec[i];  // Put aligned data
+    //*((double2*)&ga[gind_floor]) = (double2){gind_floor, gind_floor,gind_floor, gind_floor};  // Put aligned data
+    gind += sys_pads;                              // Stride to the next system
+  }
 }
 
 // TODO eliminate extra loads and stores
@@ -179,7 +236,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
   // A thread is active only if it works on valid memory
   const int active_thread   = optimized_solve || boundary_solve;
   // Check if aligned memory 
-  const int aligned         = (sys_pads % VEC) == 0;
+  const int aligned         = (sys_pads % ALIGN_DOUBLE) == 0;
   
   int n = 0;
   int ind = sys_pads * tid;
@@ -190,133 +247,6 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
   if(active_thread) {
     if(optimized_solve) {
       if(aligned) {
-        // Process first vector separately
-        load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
-        load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
-        load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
-        load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
-        
-        for (int i = 0; i < 2; i++) {
-          bb = 1.0 / l_b.f[i];
-          d2 = bb * l_d.f[i];
-          a2 = bb * l_a.f[i];
-          c2 = bb * l_c.f[i];
-          l_dd.f[i] = d2;
-          l_aa.f[i] = a2;
-          l_cc.f[i] = c2;
-        }
-        
-        for(int i = 2; i < VEC; i++) {
-          bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
-          d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-          a2 = (-l_a.f[i] * a2) * bb;
-          c2 = l_c.f[i] * bb;
-          l_dd.f[i] = d2;
-          l_aa.f[i] = a2;
-          l_cc.f[i] = c2;
-        }
-        
-        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        
-        // Forward pass
-        for(n = VEC; n < sys_size; n += VEC) {
-          load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
-          load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
-          load_array_reg8_double2(c,&l_c,n, woffset, sys_size);
-          load_array_reg8_double2(d,&l_d,n, woffset, sys_size);
-          #pragma unroll 16
-          for(int i=0; i<VEC; i++) {
-            bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
-            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
-            a2 = (-l_a.f[i] * a2) * bb;
-            c2 = l_c.f[i] * bb;
-            l_dd.f[i] = d2;
-            l_aa.f[i] = a2;
-            l_cc.f[i] = c2;
-          }
-          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        }
-        
-        n = sys_size - VEC;
-        
-        load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        
-        a2 = l_aa.f[VEC - 2];
-        c2 = l_cc.f[VEC - 2];
-        d2 = l_dd.f[VEC - 2];
-        
-        for(int i = VEC - 3; i >= 0; i--) {
-          d2 = l_dd.f[i] - l_cc.f[i] * d2;
-          a2 = l_aa.f[i] - l_cc.f[i] * a2;
-          c2 = -l_cc.f[i] * c2;
-          l_dd.f[i] = d2;
-          l_cc.f[i] = c2;
-          l_aa.f[i] = a2;
-        }
-        
-        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        
-        for(n = sys_size - (2*VEC); n > 0; n -= VEC) {
-          load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-          load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          
-          for(int i = VEC - 1; i >= 0; i--) {
-            d2 = l_dd.f[i] - l_cc.f[i] * d2;
-            a2 = l_aa.f[i] - l_cc.f[i] * a2;
-            c2 = -l_cc.f[i] * c2;
-            l_dd.f[i] = d2;
-            l_cc.f[i] = c2;
-            l_aa.f[i] = a2;
-          }
-          
-          store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-          store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-          store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        }
-        
-        n = 0;
-        
-        load_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        load_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        load_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        
-        for(int i = VEC - 1; i > 0; i--) {
-          d2 = l_dd.f[i] - l_cc.f[i] * d2;
-          a2 = l_aa.f[i] - l_cc.f[i] * a2;
-          c2 = -l_cc.f[i] * c2;
-          l_dd.f[i] = d2;
-          l_cc.f[i] = c2;
-          l_aa.f[i] = a2;
-        }
-        
-        bb = 1.0 / (1.0 - l_cc.f[0] * a2);
-        l_dd.f[0] = bb * (l_dd.f[0] - l_cc.f[0] * d2);
-        l_aa.f[0] = bb * l_aa.f[0];
-        l_cc.f[0] = bb * (-l_cc.f[0] * c2);
-        
-        store_array_reg8_double2(dd,&l_dd,n, woffset, sys_size);
-        store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
-        store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
-        
-        // prepare boundaries for communication
-        int i = tid * 6;
-        boundaries[i + 0] = aa[ind];
-        boundaries[i + 1] = aa[ind + sys_size - 1];
-        boundaries[i + 2] = cc[ind];
-        boundaries[i + 3] = cc[ind + sys_size - 1];
-        boundaries[i + 4] = dd[ind];
-        boundaries[i + 5] = dd[ind + sys_size - 1];
-      } else {
-        
         // Process first vector separately
         load_array_reg8_double2(a,&l_a,n, woffset, sys_size);
         load_array_reg8_double2(b,&l_b,n, woffset, sys_size);
@@ -368,7 +298,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
           store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
         }
         
-        // Finish off unaligned part
+        // Finish off last part that may not fill an entire vector
         
         for(int i = n; i < sys_size; i++) {
           int loc_ind = ind + i;
@@ -437,6 +367,99 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         store_array_reg8_double2(cc,&l_cc,n, woffset, sys_size);
         store_array_reg8_double2(aa,&l_aa,n, woffset, sys_size);
         
+        // prepare boundaries for communication
+        int i = tid * 6;
+        boundaries[i + 0] = aa[ind];
+        boundaries[i + 1] = aa[ind + sys_size - 1];
+        boundaries[i + 2] = cc[ind];
+        boundaries[i + 3] = cc[ind + sys_size - 1];
+        boundaries[i + 4] = dd[ind];
+        boundaries[i + 5] = dd[ind + sys_size - 1];
+      } else {
+        int ind_floor = (ind/ALIGN_DOUBLE)*ALIGN_DOUBLE;
+        int sys_off   = ind - ind_floor;
+        
+        // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
+        for(int i = 0; i < VEC; i++) {
+          if(i >= sys_off) {
+            int i_off = i - sys_off;
+            int loc_ind = ind + i_off;
+            if(i_off < 2) {
+              bb = 1.0 / b[loc_ind];
+              dd[loc_ind] = bb * d[loc_ind];
+              aa[loc_ind] = bb * a[loc_ind];
+              cc[loc_ind] = bb * c[loc_ind];
+            } else {
+              int loc_ind = ind + i_off;
+              bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+              dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
+              aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
+              cc[loc_ind] = c[loc_ind] * bb;
+            }
+          }
+        }
+        
+        int n = VEC;
+        // Back to normal
+        for(; n < sys_size - VEC; n += VEC) {
+          load_array_reg8_double2_unaligned(a,&l_a,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(b,&l_b,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(c,&l_c,n, tid, sys_pads, sys_size);
+          load_array_reg8_double2_unaligned(d,&l_d,n, tid, sys_pads, sys_size);
+          #pragma unroll 16
+          for(int i=0; i<VEC; i++) {
+            bb = 1.0 / (l_b.f[i] - l_a.f[i] * c2);
+            d2 = (l_d.f[i] - l_a.f[i] * d2) * bb;
+            a2 = (-l_a.f[i] * a2) * bb;
+            c2 = l_c.f[i] * bb;
+            l_dd.f[i] = d2;
+            l_aa.f[i] = a2;
+            l_cc.f[i] = c2;
+          }
+          store_array_reg8_double2_unaligned(dd,&l_dd,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(cc,&l_cc,n, tid, sys_pads, sys_size);
+          store_array_reg8_double2_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
+        }
+        
+        // Handle end of unaligned memory
+        for(int i = n; i < sys_size + sys_off; i++) {
+          int loc_ind = ind + i;
+          bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+          dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
+          aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
+          cc[loc_ind] = c[loc_ind] * bb;
+        }
+        
+        /*//
+        // forward pass
+        //
+        for (int i = 0; i < 2; ++i) {
+          bb = 1.0 / b[ind + i];
+          dd[ind + i] = bb * d[ind + i];
+          aa[ind + i] = bb * a[ind + i];
+          cc[ind + i] = bb * c[ind + i];
+        }
+        if (sys_size >= 3) {
+          // eliminate lower off-diagonal
+          for (int i = 2; i < sys_size; i++) {
+            int loc_ind = ind + i;
+            bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
+            dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
+            aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
+            cc[loc_ind] = c[loc_ind] * bb;
+          }*/
+          // Eliminate upper off-diagonal
+          for (int i = sys_size - 3; i > 0; --i) {
+            int loc_ind = ind + i;
+            dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
+            aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
+            cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
+          }
+          bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
+          dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
+          aa[ind] = bb * aa[ind];
+          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);
+        //}
         // prepare boundaries for communication
         int i = tid * 6;
         boundaries[i + 0] = aa[ind];
