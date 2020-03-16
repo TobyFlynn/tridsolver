@@ -443,6 +443,8 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         a2 = aa[ind_floor + sys_size + sys_off - 2];
         c2 = cc[ind_floor + sys_size + sys_off - 2];
         
+        n -= VEC;
+
         // Start with end of unaligned memory
         for(int i = sys_size + sys_off - 3; i >= n; i--) {
           int loc_ind = ind_floor + i;
@@ -476,53 +478,21 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
           store_array_reg8_double2_unaligned(aa,&l_aa,n, tid, sys_pads, sys_size);
         }
         
-        for(int i = n + VEC - 1; i >= 0; i--) {
-          if(i - sys_off > 0) {
-            int loc_ind = ind_floor + i;
-            d2 = dd[loc_ind] - cc[loc_ind] * d2;
-            a2 = aa[loc_ind] - cc[loc_ind] * a2;
-            c2 = -cc[loc_ind] * c2;
-            dd[loc_ind] = d2;
-            aa[loc_ind] = a2;
-            cc[loc_ind] = c2;
-          } else if (i - sys_off == 0) {
-            bb = 1.0 / (1.0 - cc[ind] * a2);
-            dd[ind] = bb * (dd[ind] - cc[ind] * d2);
-            aa[ind] = bb * aa[ind];
-            cc[ind] = bb * (-cc[ind] * c2);
-          }
+        for(int i = n + VEC - 1; i > sys_off; i--) {
+          int loc_ind = ind_floor + i;
+          d2 = dd[loc_ind] - cc[loc_ind] * d2;
+          a2 = aa[loc_ind] - cc[loc_ind] * a2;
+          c2 = -cc[loc_ind] * c2;
+          dd[loc_ind] = d2;
+          aa[loc_ind] = a2;
+          cc[loc_ind] = c2;
         }
         
-        /*//
-        // forward pass
-        //
-        for (int i = 0; i < 2; ++i) {
-          bb = 1.0 / b[ind + i];
-          dd[ind + i] = bb * d[ind + i];
-          aa[ind + i] = bb * a[ind + i];
-          cc[ind + i] = bb * c[ind + i];
-        }
-        if (sys_size >= 3) {
-          // eliminate lower off-diagonal
-          for (int i = 2; i < sys_size; i++) {
-            int loc_ind = ind + i;
-            bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
-            dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
-            aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
-            cc[loc_ind] = c[loc_ind] * bb;
-          }*/
-          // Eliminate upper off-diagonal
-          /*for (int i = sys_size - 3; i > 0; --i) {
-            int loc_ind = ind + i;
-            dd[loc_ind] = dd[loc_ind] - cc[loc_ind] * dd[loc_ind + 1];
-            aa[loc_ind] = aa[loc_ind] - cc[loc_ind] * aa[loc_ind + 1];
-            cc[loc_ind] = -cc[loc_ind] * cc[loc_ind + 1];
-          }
-          bb = 1.0 / (1.0 - cc[ind] * aa[ind + 1]);
-          dd[ind] = bb * (dd[ind] - cc[ind] * dd[ind + 1]);
-          aa[ind] = bb * aa[ind];
-          cc[ind] = bb * (-cc[ind] * cc[ind + 1]);*/
-        //}
+        bb = 1.0 / (1.0 - cc[ind] * a2);
+        dd[ind] = bb * (dd[ind] - cc[ind] * d2);
+        aa[ind] = bb * aa[ind];
+        cc[ind] = bb * (-cc[ind] * c2);
+
         // prepare boundaries for communication
         int i = tid * 6;
         boundaries[i + 0] = aa[ind];
