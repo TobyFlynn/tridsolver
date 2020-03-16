@@ -382,15 +382,13 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         // TODO find better way of making sure both i_off = 0, 1 have occured before next loop
         for(int i = 0; i < VEC; i++) {
           if(i >= sys_off) {
-            int i_off = i - sys_off;
-            int loc_ind = ind + i_off;
-            if(i_off < 2) {
+            int loc_ind = ind_floor + i;
+            if(i - sys_off < 2) {
               bb = 1.0 / b[loc_ind];
               dd[loc_ind] = bb * d[loc_ind];
               aa[loc_ind] = bb * a[loc_ind];
               cc[loc_ind] = bb * c[loc_ind];
             } else {
-              int loc_ind = ind + i_off;
               bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
               dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
               aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
@@ -423,7 +421,7 @@ trid_linear_forward_double(const double *__restrict__ a, const double *__restric
         
         // Handle end of unaligned memory
         for(int i = n; i < sys_size + sys_off; i++) {
-          int loc_ind = ind + i;
+          int loc_ind = ind_floor + i;
           bb = 1.0 / (b[loc_ind] - a[loc_ind] * cc[loc_ind - 1]);
           dd[loc_ind] = (d[loc_ind] - a[loc_ind] * dd[loc_ind - 1]) * bb;
           aa[loc_ind] = (-a[loc_ind] * aa[loc_ind - 1]) * bb;
