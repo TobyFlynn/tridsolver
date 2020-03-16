@@ -65,8 +65,6 @@
 template <typename REAL>
 void thomas_on_reduced_batched(REAL *receive_buf, REAL *results,
                                int sys_n, int num_proc, int mpi_coord, int reducedSysLen) {
-  const int reducedSize = reducedSysLen * sys_n;
-
   // Call PCR
   int P = (int) ceil(log2((REAL)reducedSysLen));
   int numBlocks = sys_n;
