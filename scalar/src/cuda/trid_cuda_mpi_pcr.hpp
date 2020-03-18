@@ -30,6 +30,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// Written by Toby Flynn, University of Warwick, T.Flynn@warwick.ac.uk, 2020
+
 #ifndef __TRID_CUDA_MPI_PCR_HPP
 #define __TRID_CUDA_MPI_PCR_HPP
 
@@ -189,5 +191,4 @@ __global__ void pcr_on_reduced_kernel_no_preproc(REAL *input, REAL *results,
     results[2 * tridNum + reduced_ind_l] = input[d_ind];
   }
 }
-
 #endif

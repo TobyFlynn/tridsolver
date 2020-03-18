@@ -32,11 +32,13 @@
 
 // Written by Endre Laszlo, University of Oxford, endre.laszlo@oerc.ox.ac.uk,
 // 2013-2014
+// With additions by Toby Flynn, University of Warwick, T.Flynn@warwick.ac.uk, 2020
 
 #include "trid_mpi_cpu.hpp"
 #include "trid_mpi_cuda.hpp"
 
 #include "trid_linear_mpi_reg8_double2.hpp"
+#include "trid_linear_mpi_reg16_float4.hpp"
 #include "trid_linear_mpi.hpp"
 #include "trid_strided_multidim_mpi.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
@@ -135,13 +137,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   dim3 dimBlock_x(blockdimx, blockdimy);
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
-      trid_linear_forward
+      trid_linear_forward_double
           <<<dimGrid_x, dimBlock_x>>>((double *)a, (double *)b, (double *)c, (double *)d, (double *)aa, (double *)cc, (double *)dd, (double *)boundaries,
                                       local_eq_size, local_eq_size, sys_n);
       cudaSafeCall( cudaPeekAtLastError() );
       cudaSafeCall( cudaDeviceSynchronize() );
     } else {
-      // TODO
+      trid_linear_forward_float
+          <<<dimGrid_x, dimBlock_x>>>((float *)a, (float *)b, (float *)c, (float *)d, (float *)aa, (float *)cc, (float *)dd, (float *)boundaries,
+                                      local_eq_size, local_eq_size, sys_n);
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     }
   } else {
     DIM_V pads, dims; // TODO
@@ -177,12 +183,15 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
-      trid_linear_backward<INC><<<dimGrid_x, dimBlock_x>>>(
+      trid_linear_backward_double<INC><<<dimGrid_x, dimBlock_x>>>(
           (double *)aa, (double *)cc, (double *)dd, (double *)d, (double *)u, (double *)boundaries, local_eq_size, local_eq_size, sys_n);
       cudaSafeCall( cudaPeekAtLastError() );
       cudaSafeCall( cudaDeviceSynchronize() );
     } else {
-      // TODO
+      trid_linear_backward_float<INC><<<dimGrid_x, dimBlock_x>>>(
+          (float *)aa, (float *)cc, (float *)dd, (float *)d, (float *)u, (float *)boundaries, local_eq_size, local_eq_size, sys_n);
+      cudaSafeCall( cudaPeekAtLastError() );
+      cudaSafeCall( cudaDeviceSynchronize() );
     }
   } else {
     DIM_V pads, dims; // TODO

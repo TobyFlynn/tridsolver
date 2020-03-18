@@ -157,6 +157,9 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
 
   //timing_start(app.prof, &timer);
   
+  const MPI_Datatype real_datatype =
+      std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
+  
   int nx = app.size[0];
   int ny = app.size[1];
   int nz = app.size[2];
@@ -166,7 +169,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
   int padz = app.size[2];
   
   REAL *u = (REAL *) malloc(padx * pady * padz * sizeof(REAL));
-  cudaSafeCall( cudaMemcpy(&u[0], &app.u[0], sizeof(FP) * padx * pady * padz, cudaMemcpyDeviceToHost) );
+  cudaSafeCall( cudaMemcpy(&u[0], &app.u[0], sizeof(REAL) * padx * pady * padz, cudaMemcpyDeviceToHost) );
   
   // Gather halo
   // X boundary
@@ -204,7 +207,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_x[0*nz*ny], nz*ny, MPI_DOUBLE, destination_rank, 
+      MPI_Send(&pre_handle.halo_snd_x[0*nz*ny], nz*ny, real_datatype, destination_rank, 
                0, app.comm);
   }
   // Receive
@@ -216,7 +219,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2];
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_x[0*nz*ny], nz*ny, MPI_DOUBLE, source_rank, 0,
+      MPI_Recv(&pre_handle.halo_rcv_x[0*nz*ny], nz*ny, real_datatype, source_rank, 0,
                app.comm, MPI_STATUS_IGNORE);
   }
 
@@ -230,7 +233,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_x[1*nz*ny], nz*ny, MPI_DOUBLE, destination_rank, 
+      MPI_Send(&pre_handle.halo_snd_x[1*nz*ny], nz*ny, real_datatype, destination_rank, 
                0, app.comm);
   }
   // Receive
@@ -242,7 +245,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2];
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_x[1*nz*ny], nz*ny, MPI_DOUBLE, source_rank, 0,
+      MPI_Recv(&pre_handle.halo_rcv_x[1*nz*ny], nz*ny, real_datatype, source_rank, 0,
                app.comm, MPI_STATUS_IGNORE);
   }
   
@@ -256,7 +259,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_y[0*nz*nx], nz*nx, MPI_DOUBLE, destination_rank, 
+      MPI_Send(&pre_handle.halo_snd_y[0*nz*nx], nz*nx, real_datatype, destination_rank, 
                0, app.comm);
   }
   // Receive
@@ -268,7 +271,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2];
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_y[0*nz*nx], nz*nx, MPI_DOUBLE, source_rank, 0,
+      MPI_Recv(&pre_handle.halo_rcv_y[0*nz*nx], nz*nx, real_datatype, source_rank, 0,
                app.comm, MPI_STATUS_IGNORE);
   }
   
@@ -282,7 +285,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_y[1*nz*nx], nz*nx, MPI_DOUBLE, destination_rank,
+      MPI_Send(&pre_handle.halo_snd_y[1*nz*nx], nz*nx, real_datatype, destination_rank,
                0, app.comm);
   }
   // Receive
@@ -294,7 +297,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2];
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_y[1*nz*nx], nz*nx, MPI_DOUBLE, source_rank, 0,
+      MPI_Recv(&pre_handle.halo_rcv_y[1*nz*nx], nz*nx, real_datatype, source_rank, 0,
                app.comm, MPI_STATUS_IGNORE);
   }
   
@@ -308,7 +311,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_z[0*ny*nx], nx*ny, MPI_DOUBLE, destination_rank,
+      MPI_Send(&pre_handle.halo_snd_z[0*ny*nx], nx*ny, real_datatype, destination_rank,
                0, app.comm);
   }
   // Receive
@@ -320,7 +323,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2] + 1;
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_z[0*ny*nz], nx*ny, MPI_DOUBLE, source_rank, 0,
+      MPI_Recv(&pre_handle.halo_rcv_z[0*ny*nz], nx*ny, real_datatype, source_rank, 0,
                app.comm, MPI_STATUS_IGNORE);
   }
   
@@ -334,7 +337,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       int destination_rank = 0;
       MPI_Cart_rank(app.comm, dest_coords, &destination_rank);
       // Send the boundary data
-      MPI_Send(&pre_handle.halo_snd_z[1*ny*nx], nx*ny, MPI_DOUBLE, destination_rank, 
+      MPI_Send(&pre_handle.halo_snd_z[1*ny*nx], nx*ny, real_datatype, destination_rank, 
                0, app.comm);
   }
   // Receive
@@ -346,7 +349,7 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
       source_coords[2] = app.coords[2] - 1;
       int source_rank = 0;
       MPI_Cart_rank(app.comm, source_coords, &source_rank);
-      MPI_Recv(&pre_handle.halo_rcv_z[1*ny*nx], nx*ny, MPI_DOUBLE, source_rank, 0, 
+      MPI_Recv(&pre_handle.halo_rcv_z[1*ny*nx], nx*ny, real_datatype, source_rank, 0, 
                app.comm, MPI_STATUS_IGNORE);
   }
   
@@ -354,11 +357,11 @@ inline void preproc_mpi_cuda(preproc_handle<REAL> &pre_handle, app_handle &app) 
   
   //timing_end(app.prof, &timer, &app.elapsed_time[9], app.elapsed_name[9]);
   
-  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(FP) * pre_handle.rcv_size_x, 
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_x[0], &pre_handle.halo_rcv_x[0], sizeof(REAL) * pre_handle.rcv_size_x, 
              cudaMemcpyHostToDevice) );
-  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(FP) * pre_handle.rcv_size_y, 
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_y[0], &pre_handle.halo_rcv_y[0], sizeof(REAL) * pre_handle.rcv_size_y, 
              cudaMemcpyHostToDevice) );
-  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(FP) * pre_handle.rcv_size_z, 
+  cudaSafeCall( cudaMemcpy(&pre_handle.rcv_z[0], &pre_handle.halo_rcv_z[0], sizeof(REAL) * pre_handle.rcv_size_z, 
              cudaMemcpyHostToDevice) );
   
   preproc_kernel_arg_list arg;
