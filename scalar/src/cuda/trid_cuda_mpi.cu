@@ -103,10 +103,6 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // for the iteration later
   const int outer_size = std::accumulate(dims + solvedim + 1, dims + ndim, 1,
                                          std::multiplies<int>{});
-
-  int *d_dims = NULL;
-  cudaSafeCall( cudaMalloc(&d_dims, 3 * sizeof(int)) );
-  cudaSafeCall( cudaMemcpy(d_dims, dims, sizeof(int) * 3, cudaMemcpyHostToDevice) );
   
   // The number of systems to solve
   const int sys_n = eq_stride * outer_size;
@@ -165,10 +161,6 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   
   // MPI buffers (6 because 2 from each of the a, c and d coefficient arrays)
   const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
-  /*std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(reduced_len_g * 3 * sys_n);
-  cudaSafeCall( cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
-             cudaMemcpyDeviceToHost) );*/
   REAL *recv_buf;
   cudaSafeCall( cudaMalloc(&recv_buf, reduced_len_g * 3 * sys_n * sizeof(REAL)) );
   
@@ -211,7 +203,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaFree(cc) );
   cudaSafeCall( cudaFree(dd) );
   cudaSafeCall( cudaFree(boundaries) );
-  cudaSafeCall( cudaFree(d_dims) );
+  cudaSafeCall( cudaFree(recv_buf) );
 }
 
 template <typename REAL, int INC>
