@@ -45,29 +45,29 @@ EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
                                       const double *c, double *d, double *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
-                                      int *pads);
+                                      int ndim, int solvedim, int *dims, int *pads,
+                                      int *dims_g);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
                                       const float *c, float *d, float *u,
-                                      int ndim, int solvedim, int *dims, int *dims_g,
-                                      int *pads);
+                                      int ndim, int solvedim, int *dims, int *pads,
+                                      int *dims_g);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const double *a, const double *b,
                                          const double *c, double *d, double *u,
-                                         int ndim, int solvedim, int *dims, int *dims_g,
-                                         int *pads);
+                                         int ndim, int solvedim, int *dims, int *pads,
+                                         int *dims_g);
 
 EXTERN_C
 tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const float *a, const float *b,
                                          const float *c, float *d, float *u,
-                                         int ndim, int solvedim, int *dims, int *dims_g,
-                                         int *pads);
+                                         int ndim, int solvedim, int *dims, int *pads,
+                                         int *dims_g);
 
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchPaddedMPI(
