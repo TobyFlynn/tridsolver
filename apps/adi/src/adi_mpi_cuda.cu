@@ -37,6 +37,7 @@
 #include <getopt.h>
 #include <float.h>
 #include <sys/time.h>
+#include <string>
 
 #include "trid_mpi_cuda.hpp"
 #include "trid_mpi_solver_params.hpp"
@@ -160,6 +161,29 @@ void print_array_onrank(int rank, FP* array, app_handle &app, mpi_handle &mpi) {
       }
   }
 }*/
+
+void print_array_global(FP* array, app_handle &app, int iter) {
+  std::string filename = "mpi-i-" + std::to_string(iter) + ".out";
+  
+  // At the moment will only work if array is not padded
+  MPI_Datatype viewType;
+  int numElements = app.size[0] * app.size[1] * app.size[2];
+  MPI_Type_create_subarray(3, app.size_g, app.size, app.start_g, MPI_ORDER_FORTRAN, MPI_DOUBLE, &viewType);
+  MPI_Type_commit(&viewType);
+  
+  MPI_Datatype arrayType;
+  int coords[3] = {0, 0, 0};
+  MPI_Type_create_subarray(3, app.size, app.size, coords, MPI_ORDER_FORTRAN, MPI_DOUBLE, &arrayType);
+  MPI_Type_commit(&arrayType);
+  
+  MPI_File fh;
+  MPI_File_open(app.comm, filename.c_str(), MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
+  MPI_Offset disp = 0;
+  MPI_File_set_view(fh, disp, MPI_DOUBLE, viewType, "native", MPI_INFO_NULL);
+  MPI_Status status;
+  MPI_File_write_all(fh, array, 1, arrayType, &status);
+  MPI_File_close(&fh);
+}
 
 int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, char* argv[]) {
   if( MPI_Init(&argc,&argv) != MPI_SUCCESS) { printf("MPI Couldn't initialize. Exiting"); exit(-1);}
@@ -411,6 +435,8 @@ int main(int argc, char* argv[]) {
   
   cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
   cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
+  
+  print_array_global(h_u, app, 0);
   
   rms("end h_u", h_u, app);
   rms("end du", du, app);
