@@ -37,7 +37,7 @@
 #define __TRID_CPU_H
 
 /* This is just a copy of CUSPARSE enums */
-typedef enum {
+/*typedef enum {
   TRID_STATUS_SUCCESS = 0,
   TRID_STATUS_NOT_INITIALIZED = 1,
   TRID_STATUS_ALLOC_FAILED = 2,
@@ -48,7 +48,8 @@ typedef enum {
   TRID_STATUS_INTERNAL_ERROR = 7,
   TRID_STATUS_MATRIX_TYPE_NOT_SUPPORTED = 8,
   TRID_STATUS_ZERO_PIVOT = 9
-} tridStatus_t;
+} tridStatus_t;*/
+#include "trid_common.h"
 
 //
 // Solve a batch of linear equation systems along a specified axis.

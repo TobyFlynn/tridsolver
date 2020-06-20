@@ -40,7 +40,7 @@
 #include "trid_common.h"
 #include "trid_mpi_solver_params.hpp"
 
-typedef enum {
+/*typedef enum {
   TRID_STATUS_SUCCESS = 0,
   TRID_STATUS_NOT_INITIALIZED = 1,
   TRID_STATUS_ALLOC_FAILED = 2,
@@ -51,38 +51,38 @@ typedef enum {
   TRID_STATUS_INTERNAL_ERROR = 7,
   TRID_STATUS_MATRIX_TYPE_NOT_SUPPORTED = 8,
   TRID_STATUS_ZERO_PIVOT = 9
-} tridStatus_t;
+} tridStatus_t;*/
 
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // The result is written to 'd'. 'u' is unused.
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const double *a, const double *b,
-                                      const double *c, double *d, double *u, int ndim, 
+                                      const double *c, double *d, double *u, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g);
 
 tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
                                       const float *a, const float *b,
-                                      const float *c, float *d, float *u, int ndim, 
+                                      const float *c, float *d, float *u, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g);
 
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // 'u' is incremented with the results.
 tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const double *a, const double *b,
-                                         const double *c, double *d, double *u, int ndim, 
+                                         const double *c, double *d, double *u, int ndim,
                                          int solvedim, int *dims, int *pads, int *dims_g);
 
 tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
                                          const float *a, const float *b,
-                                         const float *c, float *d, float *u, int ndim, 
+                                         const float *c, float *d, float *u, int ndim,
                                          int solvedim, int *dims, int *pads, int *dims_g);
 
 #endif

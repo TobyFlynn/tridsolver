@@ -185,32 +185,32 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   MPI_Comm_size(MPI_COMM_WORLD, &procs);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  // Create 3D Cartesian MPI topology
-  app.pdims     = (int *) calloc(3, sizeof(int));
-  int *periodic = (int *) calloc(3, sizeof(int)); //false
-  app.coords    = (int *) calloc(3, sizeof(int));
-  MPI_Dims_create(procs, 3, app.pdims);
+  // Create 2D Cartesian MPI topology
+  app.pdims     = (int *) calloc(2, sizeof(int));
+  int *periodic = (int *) calloc(2, sizeof(int)); //false
+  app.coords    = (int *) calloc(2, sizeof(int));
+  MPI_Dims_create(procs, 2, app.pdims);
 
-  // Create 3D Cartesian MPI communicator
-  MPI_Cart_create(MPI_COMM_WORLD, 3, app.pdims, periodic, 0,  &app.comm);
+  // Create 2D Cartesian MPI communicator
+  MPI_Cart_create(MPI_COMM_WORLD, 2, app.pdims, periodic, 0,  &app.comm);
 
   int my_cart_rank;
 
   MPI_Comm_rank(app.comm, &my_cart_rank);
-  MPI_Cart_coords(app.comm, my_cart_rank, 3, app.coords);
+  MPI_Cart_coords(app.comm, my_cart_rank, 2, app.coords);
 
   // Create MPI handle used by tridiagonal solver
-  app.params = new MpiSolverParams(app.comm, 3, app.pdims);
+  app.params = new MpiSolverParams(app.comm, 2, app.pdims);
 
+  app.start_g[0] = 0;
+  app.end_g[0] = app.size_g[0] - 1;
+  app.size[0] = app.size_g[0];
+  app.pads[0] = (1 + ((app.size[0] - 1) / SIMD_VEC)) * SIMD_VEC;
   // Calculate local problem size for this MPI process
-  for(int i = 0; i < 3; i++) {
-    setStartEnd(&app.start_g[i], &app.end_g[i], app.coords[i], app.pdims[i], app.size_g[i]);
-    app.size[i] = app.end_g[i] - app.start_g[i] + 1;
-    if(i == 0) {
-      app.pads[i] = (1 + ((app.size[i] - 1) / SIMD_VEC)) * SIMD_VEC;
-    } else {
-      app.pads[i] = app.size[i];
-    }
+  for(int i = 0; i < 2; i++) {
+    setStartEnd(&app.start_g[i + 1], &app.end_g[i + 1], app.coords[i], app.pdims[i], app.size_g[i + 1]);
+    app.size[i + 1] = app.end_g[i + 1] - app.start_g[i + 1] + 1;
+    app.pads[i + 1] = app.size[i + 1];
   }
 
   free(periodic);
@@ -261,8 +261,8 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   }
 
   // Allocate memory used in each iteration's preprocessing
-  pre_handle.halo_snd_x = (FP*) _mm_malloc(2 * app.size[1] * app.size[2] * sizeof(FP), SIMD_WIDTH);
-  pre_handle.halo_rcv_x = (FP*) _mm_malloc(2 * app.size[1] * app.size[2] * sizeof(FP), SIMD_WIDTH);
+  /*pre_handle.halo_snd_x = (FP*) _mm_malloc(2 * app.size[1] * app.size[2] * sizeof(FP), SIMD_WIDTH);
+  pre_handle.halo_rcv_x = (FP*) _mm_malloc(2 * app.size[1] * app.size[2] * sizeof(FP), SIMD_WIDTH);*/
   pre_handle.halo_snd_y = (FP*) _mm_malloc(2 * app.size[0] * app.size[2] * sizeof(FP), SIMD_WIDTH);
   pre_handle.halo_rcv_y = (FP*) _mm_malloc(2 * app.size[0] * app.size[2] * sizeof(FP), SIMD_WIDTH);
   pre_handle.halo_snd_z = (FP*) _mm_malloc(2 * app.size[1] * app.size[0] * sizeof(FP), SIMD_WIDTH);
@@ -274,8 +274,8 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
 
 // Free memory used
 void finalize(app_handle &app, preproc_handle<FP> &pre_handle) {
-  _mm_free(pre_handle.halo_snd_x);
-  _mm_free(pre_handle.halo_rcv_x);
+  /*_mm_free(pre_handle.halo_snd_x);
+  _mm_free(pre_handle.halo_rcv_x);*/
   _mm_free(pre_handle.halo_snd_y);
   _mm_free(pre_handle.halo_rcv_y);
   _mm_free(pre_handle.halo_snd_z);
