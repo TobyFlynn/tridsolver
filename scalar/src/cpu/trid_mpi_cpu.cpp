@@ -72,21 +72,34 @@ void swapDecomposition(MpiSolverParams &params, REAL *ax, REAL *bx, REAL *cx,
   }
 
   if(params.currentDim == 1 && solvedim == 2) {
-    exchange(params.communicators[1], real_datatype, 3, sizesY, ay, 0, sizesZ, az, 1);
-    exchange(params.communicators[1], real_datatype, 3, sizesY, by, 0, sizesZ, bz, 1);
-    exchange(params.communicators[1], real_datatype, 3, sizesY, cy, 0, sizesZ, cz, 1);
-    exchange(params.communicators[1], real_datatype, 3, sizesY, dy, 0, sizesZ, dz, 1);
-    exchange(params.communicators[1], real_datatype, 3, sizesY, uy, 0, sizesZ, uz, 1);
+    exchange(params.communicators[1], real_datatype, 3, sizesY, ay, 1, sizesZ, az, 2);
+    exchange(params.communicators[1], real_datatype, 3, sizesY, by, 1, sizesZ, bz, 2);
+    exchange(params.communicators[1], real_datatype, 3, sizesY, cy, 1, sizesZ, cz, 2);
+    exchange(params.communicators[1], real_datatype, 3, sizesY, dy, 1, sizesZ, dz, 2);
+    exchange(params.communicators[1], real_datatype, 3, sizesY, uy, 1, sizesZ, uz, 2);
     params.currentDim = 2;
     return;
   }
 
   if(params.currentDim == 2 && solvedim == 0) {
-    exchange(params.communicators[0], real_datatype, 3, sizesZ, az, 0, sizesX, ax, 1);
-    exchange(params.communicators[0], real_datatype, 3, sizesZ, bz, 0, sizesX, bx, 1);
-    exchange(params.communicators[0], real_datatype, 3, sizesZ, cz, 0, sizesX, cx, 1);
-    exchange(params.communicators[0], real_datatype, 3, sizesZ, dz, 0, sizesX, dx, 1);
-    exchange(params.communicators[0], real_datatype, 3, sizesZ, uz, 0, sizesX, ux, 1);
+    /*exchange(params.communicators[0], real_datatype, 3, sizesZ, az, 2, sizesX, ax, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesZ, bz, 2, sizesX, bx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesZ, cz, 2, sizesX, cx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesZ, dz, 2, sizesX, dx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesZ, uz, 2, sizesX, ux, 0);*/
+
+    exchange(params.communicators[1], real_datatype, 3, sizesZ, az, 2, sizesY, ay, 1);
+    exchange(params.communicators[1], real_datatype, 3, sizesZ, bz, 2, sizesY, by, 1);
+    exchange(params.communicators[1], real_datatype, 3, sizesZ, cz, 2, sizesY, cy, 1);
+    exchange(params.communicators[1], real_datatype, 3, sizesZ, dz, 2, sizesY, dy, 1);
+    exchange(params.communicators[1], real_datatype, 3, sizesZ, uz, 2, sizesY, uy, 1);
+
+    exchange(params.communicators[0], real_datatype, 3, sizesY, ay, 1, sizesX, ax, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesY, by, 1, sizesX, bx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesY, cy, 1, sizesX, cx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesY, dy, 1, sizesX, dx, 0);
+    exchange(params.communicators[0], real_datatype, 3, sizesY, uy, 1, sizesX, ux, 0);
+
     params.currentDim = 0;
     return;
   }
@@ -168,7 +181,7 @@ tridStatus_t tridDmtsvStridedBatchMPI(MpiSolverParams &params,
                                       double *cz, double *dz, double *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g) {
   tridMultiDimBatchSolve<double, 0>(params, ax, bx, cx, dx, ux, ay, by, cy, dy, uy,
-                                    az, bz, cz, dz, uz, ndim, solvedim, dims, pads);
+                                    az, bz, cz, dz, uz, ndim, solvedim, dims_g, pads);
   return TRID_STATUS_SUCCESS;
 }
 #else
@@ -179,7 +192,7 @@ tridStatus_t tridSmtsvStridedBatchMPI(MpiSolverParams &params,
                                       float *cz, float *dz, float *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g) {
   tridMultiDimBatchSolve<float, 0>(params, ax, bx, cx, dx, ux, ay, by, cy, dy, uy,
-                                    az, bz, cz, dz, uz, ndim, solvedim, dims, pads);
+                                    az, bz, cz, dz, uz, ndim, solvedim, dims_g, pads);
   return TRID_STATUS_SUCCESS;
 }
 #endif
@@ -199,7 +212,7 @@ tridStatus_t tridDmtsvStridedBatchIncMPI(MpiSolverParams &params,
                                       double *cz, double *dz, double *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g) {
   tridMultiDimBatchSolve<double, 1>(params, ax, bx, cx, dx, ux, ay, by, cy, dy, uy,
-                                    az, bz, cz, dz, uz, ndim, solvedim, dims, pads);
+                                    az, bz, cz, dz, uz, ndim, solvedim, dims_g, pads);
   return TRID_STATUS_SUCCESS;
 }
 #else
@@ -210,7 +223,7 @@ tridStatus_t tridSmtsvStridedBatchIncMPI(MpiSolverParams &params,
                                       float *cz, float *dz, float *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g) {
   tridMultiDimBatchSolve<float, 1>(params, ax, bx, cx, dx, ux, ay, by, cy, dy, uy,
-                                    az, bz, cz, dz, uz, ndim, solvedim, dims, pads);
+                                    az, bz, cz, dz, uz, ndim, solvedim, dims_g, pads);
   return TRID_STATUS_SUCCESS;
 }
 #endif
