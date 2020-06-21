@@ -1,3 +1,6 @@
+#ifndef __TRID_MPI_PENCIL_DECOMP_HPP
+#define __TRID_MPI_PENCIL_DECOMP_HPP
+
 #include "mpi.h"
 
 #define min(x, y) (((x) < (y)) ? (x) : (y))
@@ -64,3 +67,13 @@ void subcomm(MPI_Comm comm, int ndims, MPI_Comm subcomms[ndims]) {
   }
   MPI_Comm_free(&comm_cart);
 }
+
+int lsz(int N, MPI_Comm comm) {
+  int size, rank, n, s;
+  MPI_Comm_size(comm, &size);
+  MPI_Comm_rank(comm, &rank);
+  decompose(N, size, rank, &n, &s);
+  return n;
+}
+
+#endif

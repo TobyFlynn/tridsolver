@@ -44,6 +44,8 @@ struct MpiSolverParams {
   // The coordinates of the current MPI process in the cartesian mesh.
   std::vector<int> mpi_coords;
 
+  int currentDim;
+
   // Assumes that the number
   MpiSolverParams(MPI_Comm cartesian_communicator, int num_dims,
                   int *num_mpi_procs_)
@@ -82,6 +84,8 @@ struct MpiSolverParams {
       MPI_Comm_create(cartesian_communicator, neighbours_group,
                       &this->communicators[equation_dim]);
     }
+
+    currentDim = 0;
   }
 };
 

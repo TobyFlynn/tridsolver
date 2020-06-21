@@ -6,21 +6,37 @@
 
 // ADI handle for MPI versions of the application
 struct app_handle {
-  FP *a;
-  FP *b;
-  FP *c;
-  FP *d;
-  FP *u;
-  
+  FP *ax;
+  FP *bx;
+  FP *cx;
+  FP *dx;
+  FP *ux;
+
+  FP *ay;
+  FP *by;
+  FP *cy;
+  FP *dy;
+  FP *uy;
+
+  FP *az;
+  FP *bz;
+  FP *cz;
+  FP *dz;
+  FP *uz;
+
+  int sizesX[3];
+  int sizesY[3];
+  int sizesZ[3];
+
   int *size_g;
   int *size;
   int *start_g;
   int *end_g;
   int *pads;
-  
+
   int *pdims;
   int *coords;
-  
+
   MPI_Comm comm;
   MpiSolverParams *params;
 };

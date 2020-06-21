@@ -40,49 +40,44 @@
 #include "trid_common.h"
 #include "trid_mpi_solver_params.hpp"
 
-typedef enum {
-  TRID_STATUS_SUCCESS = 0,
-  TRID_STATUS_NOT_INITIALIZED = 1,
-  TRID_STATUS_ALLOC_FAILED = 2,
-  TRID_STATUS_INVALID_VALUE = 3,
-  TRID_STATUS_ARCH_MISMATCH = 4,
-  TRID_STATUS_MAPPING_ERROR = 5,
-  TRID_STATUS_EXECUTION_FAILED = 6,
-  TRID_STATUS_INTERNAL_ERROR = 7,
-  TRID_STATUS_MATRIX_TYPE_NOT_SUPPORTED = 8,
-  TRID_STATUS_ZERO_PIVOT = 9
-} tridStatus_t;
-
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // The result is written to 'd'. 'u' is unused.
-tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
-                                      const double *a, const double *b,
-                                      const double *c, double *d, double *u, int ndim, 
+tridStatus_t tridDmtsvStridedBatchMPI(MpiSolverParams &params,
+                                      double *ax, double *bx, double *cx, double *dx,
+                                      double *ux, double *ay, double *by, double *cy,
+                                      double *dy, double *uy, double *az, double *bz,
+                                      double *cz, double *dz, double *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g);
 
-tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
-                                      const float *a, const float *b,
-                                      const float *c, float *d, float *u, int ndim, 
+tridStatus_t tridSmtsvStridedBatchMPI(MpiSolverParams &params,
+                                      float *ax, float *bx, float *cx, float *dx,
+                                      float *ux, float *ay, float *by, float *cy,
+                                      float *dy, float *uy, float *az, float *bz,
+                                      float *cz, float *dz, float *uz, int ndim,
                                       int solvedim, int *dims, int *pads, int *dims_g);
 
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // 'u' is incremented with the results.
-tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
-                                         const double *a, const double *b,
-                                         const double *c, double *d, double *u, int ndim, 
-                                         int solvedim, int *dims, int *pads, int *dims_g);
+tridStatus_t tridDmtsvStridedBatchIncMPI(MpiSolverParams &params,
+                                      double *ax, double *bx, double *cx, double *dx,
+                                      double *ux, double *ay, double *by, double *cy,
+                                      double *dy, double *uy, double *az, double *bz,
+                                      double *cz, double *dz, double *uz, int ndim,
+                                      int solvedim, int *dims, int *pads, int *dims_g);
 
-tridStatus_t tridSmtsvStridedBatchIncMPI(const MpiSolverParams &params,
-                                         const float *a, const float *b,
-                                         const float *c, float *d, float *u, int ndim, 
-                                         int solvedim, int *dims, int *pads, int *dims_g);
+tridStatus_t tridSmtsvStridedBatchIncMPI(MpiSolverParams &params,
+                                      float *ax, float *bx, float *cx, float *dx,
+                                      float *ux, float *ay, float *by, float *cy,
+                                      float *dy, float *uy, float *az, float *bz,
+                                      float *cz, float *dz, float *uz, int ndim,
+                                      int solvedim, int *dims, int *pads, int *dims_g);
 
 #endif
