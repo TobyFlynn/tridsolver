@@ -22,7 +22,7 @@ void subarray(MPI_Datatype datatype, int ndims, int sizes[ndims], int axis, int 
     decompose(sizes[axis], nparts, p, &n, &s);
     subsizes[axis] = n;
     substarts[axis] = s;
-    MPI_Type_create_subarray(ndims, sizes, subsizes, substarts, MPI_ORDER_C, datatype, &subarrays[p]);
+    MPI_Type_create_subarray(ndims, sizes, subsizes, substarts, MPI_ORDER_FORTRAN, datatype, &subarrays[p]);
     MPI_Type_commit(&subarrays[p]);
   }
 }

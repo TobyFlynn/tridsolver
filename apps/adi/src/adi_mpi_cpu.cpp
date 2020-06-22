@@ -374,9 +374,6 @@ int main(int argc, char* argv[]) {
 
   timing_start(&timer1);
 
-  rms("start h", app.uz, app);
-  rms("start d", app.dz, app);
-
   // Iterate over specified number of time steps
   for(int it = 0; it < iter; it++) {
     // Preprocess
@@ -385,9 +382,6 @@ int main(int argc, char* argv[]) {
     preproc_mpi<FP>(pre_handle, app);
 
     timing_end(&timer, &elapsed_preproc);
-
-    rms("preproc h", app.uz, app);
-    rms("preproc d", app.dz, app);
 
     //
     // perform tri-diagonal solves in x-direction
@@ -404,9 +398,6 @@ int main(int argc, char* argv[]) {
 #endif
     timing_end(&timer, &elapsed_trid_x);
 
-    rms("post x h", app.ux, app);
-    rms("post x d", app.dx, app);
-
     //
     // perform tri-diagonal solves in y-direction
     //
@@ -422,9 +413,6 @@ int main(int argc, char* argv[]) {
 #endif
     timing_end(&timer, &elapsed_trid_y);
 
-    rms("post y h", app.uy, app);
-    rms("post y d", app.dy, app);
-
     //
     // perform tri-diagonal solves in z-direction
     //
@@ -439,9 +427,6 @@ int main(int argc, char* argv[]) {
                              app.cz, app.dz, app.uz, 3, 2, app.size, app.pads, app.size_g);
 #endif
     timing_end(&timer, &elapsed_trid_z);
-
-    rms("post z h", app.uz, app);
-    rms("post z d", app.dz, app);
   }
 
   timing_end(&timer1, &elapsed_total);
