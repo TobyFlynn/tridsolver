@@ -44,6 +44,8 @@
 #include "trid_strided_multidim_mpi.hpp"
 #include "trid_cuda_mpi_pcr.hpp"
 
+#include "trid_cuda.h"
+
 #include "cutil_inline.h"
 
 #include <cassert>
@@ -70,11 +72,11 @@ void thomas_on_reduced_batched(REAL *receive_buf, REAL *results,
   // Calculate number of CUDA threads required, keeping reduced systems within the same block
   int numThreads =  ((128 / reducedSysLen) + 1) * reducedSysLen;
   int numBlocks = (int) ceil((REAL)(sys_n * reducedSysLen) / (REAL)numThreads);
-  
+
   // Call PCR kernel
-  pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(receive_buf, results, mpi_coord, 
+  pcr_on_reduced_kernel<REAL><<<numBlocks, numThreads>>>(receive_buf, results, mpi_coord,
                                                          reducedSysLen, P, sys_n);
-  
+
   // Check for errros
   cudaSafeCall( cudaPeekAtLastError() );
   cudaSafeCall( cudaDeviceSynchronize() );
@@ -88,6 +90,35 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                                int *dims, int *dims_g) {
   // TODO paddings!!
   assert(solvedim < ndim);
+
+  if(solvedim == 1) {
+    // Single node solve in Z dimension
+    int opts[3] = {0, 0, 0};
+    int sync = 1;
+    if(INC) {
+      if(std::is_same<REAL, float>::value) {
+        tridSmtsvStridedBatchPaddedINC((float *)a, a_pads, (float *)b, b_pads, (float *)c,
+                                       c_pads, (float *)d, d_pads, (float *)u, u_pads, ndim,
+                                       solvedim, dims, opts, sync);
+      } else {
+        tridDmtsvStridedBatchPaddedINC((double *)a, a_pads, (double *)b, b_pads, (double *)c,
+                                       c_pads, (double *)d, d_pads, (double *)u, u_pads, ndim,
+                                       solvedim, dims, opts, sync);
+      }
+    } else {
+      if(std::is_same<REAL, float>::value) {
+        tridSmtsvStridedBatchPadded((float *)a, a_pads, (float *)b, b_pads, (float *)c,
+                                    c_pads, (float *)d, d_pads, (float *)u,
+                                    u_pads, ndim, solvedim, dims, opts, sync);
+      } else {
+        tridDmtsvStridedBatchPadded((double *)a, a_pads, (double *)b, b_pads, (double *)c,
+                                    c_pads, (double *)d, d_pads, (double *)u,
+                                    u_pads, ndim, solvedim, dims, opts, sync);
+      }
+    }
+    return;
+  }
+
   assert((
       (std::is_same<REAL, float>::value || std::is_same<REAL, double>::value) &&
       "trid_solve_mpi: only double or float values are supported"));
@@ -104,17 +135,17 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   // for the iteration later
   const int outer_size = std::accumulate(dims + solvedim + 1, dims + ndim, 1,
                                          std::multiplies<int>{});
-  
+
   // The number of systems to solve
   const int sys_n = eq_stride * outer_size;
 
   const MPI_Datatype real_datatype =
       std::is_same<REAL, double>::value ? MPI_DOUBLE : MPI_FLOAT;
-  
+
   // The local and global lengths of reduced systems
   int reduced_len_g;
   int reduced_len_l;
-  
+
   reduced_len_g = 2 * params.num_mpi_procs[solvedim];
   reduced_len_l = 2;
 
@@ -125,7 +156,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaSafeCall( cudaMalloc(&cc, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&dd, local_helper_size * sizeof(REAL)) );
   cudaSafeCall( cudaMalloc(&boundaries, sys_n * 3 * reduced_len_l * sizeof(REAL)) );
-  
+
   // Calculate required number of CUDA threads and blocksS
   int blockdimx = 128;
   int blockdimy = 1;
@@ -135,7 +166,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
   dim3 dimGrid_x(dimgridx, dimgridy);
   dim3 dimBlock_x(blockdimx, blockdimy);
-  
+
   // Do modified thomas forward pass
   if (solvedim == 0) {
     if(std::is_same<REAL, double>::value) {
@@ -157,42 +188,42 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       pads.v[i] = a_pads[i];
       dims.v[i] = a_pads[i];
     }
-    
+
     trid_strided_multidim_forward<REAL><<<dimGrid_x, dimBlock_x>>>(
         a, pads, b, pads, c, pads, d, pads, aa, cc, dd, boundaries,
         ndim, solvedim, sys_n, dims);
     cudaSafeCall( cudaPeekAtLastError() );
     cudaSafeCall( cudaDeviceSynchronize() );
   }
-  
+
   // Allocate receive buffer for MPI allgather of reduced system
   const size_t comm_buf_size = reduced_len_l * 3 * sys_n;
   REAL *recv_buf;
   cudaSafeCall( cudaMalloc(&recv_buf, reduced_len_g * 3 * sys_n * sizeof(REAL)) );
-  
-#ifdef TRID_CUDA_AWARE_MPI                             
-  // Gather the reduced system to all nodes (using CUDA aware MPI)    
-  MPI_Allgather(boundaries, comm_buf_size, real_datatype,    
-                recv_buf, comm_buf_size, real_datatype,    
-                params.communicators[solvedim]);                                                                      
-#else    
-  // MPI buffers on host                       
-  std::vector<REAL> send_buf(comm_buf_size),    
-      receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);    
-  cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,    
-             cudaMemcpyDeviceToHost);    
-  // Communicate boundary results    
-  MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,    
-                receive_buf.data(), comm_buf_size, real_datatype,                                                            
-                params.communicators[solvedim]);    
-  // copy the results of the reduced systems to the beginning of the boundaries              
-  // array    
-  cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),    
-             cudaMemcpyHostToDevice);    
-#endif   
+
+#ifdef TRID_CUDA_AWARE_MPI
+  // Gather the reduced system to all nodes (using CUDA aware MPI)
+  MPI_Allgather(boundaries, comm_buf_size, real_datatype,
+                recv_buf, comm_buf_size, real_datatype,
+                params.communicators[solvedim]);
+#else
+  // MPI buffers on host
+  std::vector<REAL> send_buf(comm_buf_size),
+      receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
+  cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
+             cudaMemcpyDeviceToHost);
+  // Communicate boundary results
+  MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
+                receive_buf.data(), comm_buf_size, real_datatype,
+                params.communicators[solvedim]);
+  // copy the results of the reduced systems to the beginning of the boundaries
+  // array
+  cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),
+             cudaMemcpyHostToDevice);
+#endif
 
   // Solve the reduced system
-  thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n, 
+  thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n,
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g);
 
@@ -215,7 +246,7 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
       pads.v[i] = a_pads[i];
       dims.v[i] = a_pads[i];
     }
-    
+
     trid_strided_multidim_backward<REAL, INC>
         <<<dimGrid_x, dimBlock_x>>>(aa, pads, cc, pads, dd, d, pads, u, pads,
                                     boundaries, ndim, solvedim, sys_n, dims);
@@ -240,10 +271,10 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 }
 
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // The result is written to 'd'. 'u' is unused.
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchMPI(const MpiSolverParams &params,
@@ -268,10 +299,10 @@ tridStatus_t tridSmtsvStridedBatchMPI(const MpiSolverParams &params,
 }
 
 // Solve a batch of tridiagonal systems along a specified axis ('solvedim').
-// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in 
-// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in 
+// 'a', 'b', 'c', 'd' are the parameters of the tridiagonal systems which must be stored in
+// arrays of size 'dims' with 'ndim' dimensions. The 'pads' array specifies any padding used in
 // the arrays (the total length of each dimension including padding).
-// 
+//
 // 'u' is incremented with the results.
 EXTERN_C
 tridStatus_t tridDmtsvStridedBatchIncMPI(const MpiSolverParams &params,
@@ -339,4 +370,3 @@ tridStatus_t tridSmtsvStridedBatchPaddedIncMPI(
                                       dims, dims_g);
   return TRID_STATUS_SUCCESS;
 }
-
