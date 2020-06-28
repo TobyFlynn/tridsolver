@@ -112,6 +112,8 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
                               (double *)u, ndim, solvedim, dims, a_pads, opts, sync);
       }
     }
+    cudaSafeCall( cudaPeekAtLastError() );
+    cudaSafeCall( cudaDeviceSynchronize() );
     return;
   }
 
@@ -199,9 +201,15 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
 
 #ifdef TRID_CUDA_AWARE_MPI
   // Gather the reduced system to all nodes (using CUDA aware MPI)
-  MPI_Allgather(boundaries, comm_buf_size, real_datatype,
-                recv_buf, comm_buf_size, real_datatype,
-                params.communicators[solvedim]);
+  if(solvedim == 0) {
+    MPI_Allgather(boundaries, comm_buf_size, real_datatype,
+                  recv_buf, comm_buf_size, real_datatype,
+                  params.communicators[solvedim]);
+  } else {
+    MPI_Allgather(boundaries, comm_buf_size, real_datatype,
+                  recv_buf, comm_buf_size, real_datatype,
+                  params.communicators[solvedim - 1]);
+  }
 #else
   // MPI buffers on host
   std::vector<REAL> send_buf(comm_buf_size),
@@ -209,9 +217,15 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
              cudaMemcpyDeviceToHost);
   // Communicate boundary results
-  MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
-                receive_buf.data(), comm_buf_size, real_datatype,
-                params.communicators[solvedim]);
+  if(solvedim == 0) {
+    MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
+                  receive_buf.data(), comm_buf_size, real_datatype,
+                  params.communicators[solvedim]);
+  } else {
+    MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
+                  receive_buf.data(), comm_buf_size, real_datatype,
+                  params.communicators[solvedim - 1]);
+  }
   // copy the results of the reduced systems to the beginning of the boundaries
   // array
   cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),
