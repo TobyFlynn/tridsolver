@@ -30,7 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Written by Endre Laszlo, University of Oxford, endre.laszlo@oerc.ox.ac.uk, 2013-2014 
+// Written by Endre Laszlo, University of Oxford, endre.laszlo@oerc.ox.ac.uk, 2013-2014
 
 #ifndef __TRID_CUDA_H
 #define __TRID_CUDA_H
@@ -47,7 +47,7 @@
 #endif
 
 /* This is just a copy of CUSPARSE enums */
-typedef enum{
+/*typedef enum{
     TRID_STATUS_SUCCESS=0,
     TRID_STATUS_NOT_INITIALIZED=1,
     TRID_STATUS_ALLOC_FAILED=2,
@@ -58,7 +58,8 @@ typedef enum{
     TRID_STATUS_INTERNAL_ERROR=7,
     TRID_STATUS_MATRIX_TYPE_NOT_SUPPORTED=8,
     TRID_STATUS_ZERO_PIVOT=9
-} tridStatus_t;
+} tridStatus_t;*/
+#include "trid_common.h"
 
 EXTERN_C
 void initTridMultiDimBatchSolve(int ndim, int *dims, int *pads);
