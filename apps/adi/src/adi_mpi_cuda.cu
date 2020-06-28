@@ -200,8 +200,8 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   cutilDeviceInit(argc, argv);
   cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
-  // Create 3D Cartesian MPI communicator
-  MPI_Cart_create(MPI_COMM_WORLD, 3, app.pdims, periodic, 0,  &app.comm);
+  // Create 2D Cartesian MPI communicator
+  MPI_Cart_create(MPI_COMM_WORLD, 2, app.pdims, periodic, 0,  &app.comm);
 
   int my_cart_rank;
 
