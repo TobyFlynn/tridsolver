@@ -271,7 +271,7 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
 
   // Allocate memory used in each iteration's preprocessing
   pre_handle.rcv_size_x = 2 * app.size[1] * app.size[2];
-  pre_handle.rcv_size_y = 2 * app.size[0] * app.size[2];
+  //pre_handle.rcv_size_y = 2 * app.size[0] * app.size[2];
   pre_handle.rcv_size_z = 2 * app.size[1] * app.size[0];
 
   pre_handle.halo_snd_x = (FP*) malloc(pre_handle.rcv_size_x * sizeof(FP));
