@@ -97,23 +97,19 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
     int sync = 1;
     if(INC) {
       if(std::is_same<REAL, float>::value) {
-        tridSmtsvStridedBatchPaddedINC((float *)a, a_pads, (float *)b, b_pads, (float *)c,
-                                       c_pads, (float *)d, d_pads, (float *)u, u_pads, ndim,
-                                       solvedim, dims, opts, sync);
+        tridSmtsvStridedBatchInc((float *)a, (float *)b, (float *)c, (float *)d,
+                                 (float *)u, ndim, solvedim, dims, a_pads, opts, sync);
       } else {
-        tridDmtsvStridedBatchPaddedINC((double *)a, a_pads, (double *)b, b_pads, (double *)c,
-                                       c_pads, (double *)d, d_pads, (double *)u, u_pads, ndim,
-                                       solvedim, dims, opts, sync);
+        tridDmtsvStridedBatchInc((double *)a, (double *)b, (double *)c, (double *)d,
+                                 (double *)u, ndim, solvedim, dims, a_pads, opts, sync);
       }
     } else {
       if(std::is_same<REAL, float>::value) {
-        tridSmtsvStridedBatchPadded((float *)a, a_pads, (float *)b, b_pads, (float *)c,
-                                    c_pads, (float *)d, d_pads, (float *)u,
-                                    u_pads, ndim, solvedim, dims, opts, sync);
+        tridSmtsvStridedBatch((float *)a, (float *)b, (float *)c, (float *)d, (float *)u,
+                              ndim, solvedim, dims, a_pads, opts, sync);
       } else {
-        tridDmtsvStridedBatchPadded((double *)a, a_pads, (double *)b, b_pads, (double *)c,
-                                    c_pads, (double *)d, d_pads, (double *)u,
-                                    u_pads, ndim, solvedim, dims, opts, sync);
+        tridDmtsvStridedBatch((double *)a, (double *)b, (double *)c, (double *)d,
+                              (double *)u, ndim, solvedim, dims, a_pads, opts, sync);
       }
     }
     return;
