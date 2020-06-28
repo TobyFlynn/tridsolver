@@ -147,14 +147,20 @@ void test_solver_from_file(const std::string &file_name) {
   int domain_size = 1;
   for (size_t i = 0; i < local_sizes.size(); ++i) {
     const int global_dim = mesh.dims()[i];
-    if(i == 1) {
-      domain_offsets[i] = 0;
-      local_sizes[i] = global_dim;
-    } else {
+    if(i == 0) {
       domain_offsets[i] = params.mpi_coords[i] * (global_dim / mpi_dims[i]);
       local_sizes[i] = params.mpi_coords[i] == mpi_dims[i] - 1
                            ? global_dim - domain_offsets[i]
                            : global_dim / mpi_dims[i];
+      global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
+    } else if(i == 1) {
+      domain_offsets[i] = 0;
+      local_sizes[i] = global_dim;
+    } else {
+      domain_offsets[i] = params.mpi_coords[i - 1] * (global_dim / mpi_dims[i - 1]);
+      local_sizes[i] = params.mpi_coords[i - 1] == mpi_dims[i - 1] - 1
+                           ? global_dim - domain_offsets[i]
+                           : global_dim / mpi_dims[i - 1];
       global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
     }
     domain_size *= local_sizes[i];
