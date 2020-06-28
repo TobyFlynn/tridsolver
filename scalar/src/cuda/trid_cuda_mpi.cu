@@ -144,7 +144,11 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   int reduced_len_g;
   int reduced_len_l;
 
-  reduced_len_g = 2 * params.num_mpi_procs[solvedim];
+  if(solvedim == 0) {
+    reduced_len_g = 2 * params.num_mpi_procs[solvedim];
+  } else {
+    reduced_len_g = 2 * params.num_mpi_procs[solvedim - 1];
+  }
   reduced_len_l = 2;
 
   // Allocate memory used during the solve
@@ -212,30 +216,45 @@ void tridMultiDimBatchSolveMPI(const MpiSolverParams &params, const REAL *a,
   }
 #else
   // MPI buffers on host
-  std::vector<REAL> send_buf(comm_buf_size),
-      receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
-  cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
-             cudaMemcpyDeviceToHost);
-  // Communicate boundary results
   if(solvedim == 0) {
+    std::vector<REAL> send_buf(comm_buf_size),
+        receive_buf(comm_buf_size * params.num_mpi_procs[solvedim]);
+
+    cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
+               cudaMemcpyDeviceToHost);
+
     MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                   receive_buf.data(), comm_buf_size, real_datatype,
                   params.communicators[solvedim]);
+
+    cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),
+               cudaMemcpyHostToDevice);
   } else {
+    std::vector<REAL> send_buf(comm_buf_size),
+        receive_buf(comm_buf_size * params.num_mpi_procs[solvedim - 1]);
+
+    cudaMemcpy(send_buf.data(), boundaries, sizeof(REAL) * comm_buf_size,
+               cudaMemcpyDeviceToHost);
+
     MPI_Allgather(send_buf.data(), comm_buf_size, real_datatype,
                   receive_buf.data(), comm_buf_size, real_datatype,
                   params.communicators[solvedim - 1]);
+
+    cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),
+               cudaMemcpyHostToDevice);
   }
-  // copy the results of the reduced systems to the beginning of the boundaries
-  // array
-  cudaMemcpy(recv_buf, receive_buf.data(), reduced_len_g * 3 * sys_n * sizeof(REAL),
-             cudaMemcpyHostToDevice);
 #endif
 
   // Solve the reduced system
-  thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n,
+  if(solvedim == 0) {
+    thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n,
                                     params.num_mpi_procs[solvedim],
                                     params.mpi_coords[solvedim], reduced_len_g);
+  } else {
+    thomas_on_reduced_batched<REAL>(recv_buf, boundaries, sys_n,
+                                    params.num_mpi_procs[solvedim - 1],
+                                    params.mpi_coords[solvedim - 1], reduced_len_g);
+  }
 
   // Do the backward pass to solve for remaining unknowns
   if (solvedim == 0) {

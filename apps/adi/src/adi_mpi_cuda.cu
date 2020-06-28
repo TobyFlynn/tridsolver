@@ -213,16 +213,13 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
 
   setStartEnd(&app.start_g[0], &app.end_g[0], app.coords[0], app.pdims[0], app.size_g[0]);
   app.size[0] = app.end_g[0] - app.start_g[0] + 1;
-  app.pads[0] = app.size[0];
 
   app.start_g[1] = 0;
   app.end_g[1] = app.size_g[1] - 1;
   app.size[1] = app.size_g[1];
-  app.pads[1] = app.size[1];
 
   setStartEnd(&app.start_g[2], &app.end_g[2], app.coords[1], app.pdims[1], app.size_g[2]);
   app.size[2] = app.end_g[2] - app.start_g[2] + 1;
-  app.pads[2] = app.size[2];
 
   free(periodic);
 
@@ -230,8 +227,8 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     printf("\nGlobal grid dimensions: %d x %d x %d\n",
            app.size_g[0], app.size_g[1], app.size_g[2]);
 
-    printf("\nNumber of MPI procs in each dimenstion %d, %d, %d\n",
-           app.pdims[0], app.pdims[1], app.pdims[2]);
+    printf("\nNumber of MPI procs in each dimenstion %d, %d\n",
+           app.pdims[0], app.pdims[1]);
   }
 
   // Allocate memory for local section of problem
