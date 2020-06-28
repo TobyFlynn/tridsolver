@@ -196,7 +196,7 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   // Setup up which GPU this MPI process is using
   // Currently set for 4 GPUs per node, with 1 MPI process per GPU
   //devid = rank % 4;
-  cudaSafeCall( cudaSetDevice(devid) );
+  //cudaSafeCall( cudaSetDevice(devid) );
   cutilDeviceInit(argc, argv);
   cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 
@@ -211,18 +211,18 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   // Create MPI handle used by tridiagonal solver
   app.params = new MpiSolverParams(app.comm, 2, app.pdims);
 
-  // Calculate local problem size for this MPI process
-  for(int i = 0; i < 3; i++) {
-    if(i == 1) {
-      app.start_g[1] = 0;
-      app.end_g[1] = app.size_g[1] - 1;
-      app.size[1] = app.size_g[1];
-      app.pads[1] = app.size[1];
-    } else {
-      setStartEnd(&app.start_g[i], &app.end_g[i], app.coords[i], app.pdims[i], app.size_g[i]);
-      app.size[i] = app.end_g[i] - app.start_g[i] + 1;
-    }
-  }
+  setStartEnd(&app.start_g[0], &app.end_g[0], app.coords[0], app.pdims[0], app.size_g[0]);
+  app.size[0] = app.end_g[0] - app.start_g[0] + 1;
+  app.pads[0] = app.size[0];
+
+  app.start_g[1] = 0;
+  app.end_g[1] = app.size_g[1] - 1;
+  app.size[1] = app.size_g[1];
+  app.pads[1] = app.size[1];
+
+  setStartEnd(&app.start_g[2], &app.end_g[2], app.coords[1], app.pdims[1], app.size_g[2]);
+  app.size[2] = app.end_g[2] - app.start_g[2] + 1;
+  app.pads[2] = app.size[2];
 
   free(periodic);
 
