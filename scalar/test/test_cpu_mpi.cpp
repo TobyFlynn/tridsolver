@@ -129,14 +129,14 @@ void test_solver_from_file(const std::string &file_name) {
 
   // Create rectangular grid
   std::vector<int> mpi_dims(2), periods(2, 0);
-  MPI_Dims_create(num_proc, mesh.dims().size(), mpi_dims.data());
+  MPI_Dims_create(num_proc, mesh.dims().size() - 1, mpi_dims.data());
 
   // Create communicator for grid
   MPI_Comm cart_comm;
-  MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size(), mpi_dims.data(),
+  MPI_Cart_create(MPI_COMM_WORLD, mesh.dims().size() - 1, mpi_dims.data(),
                   periods.data(), 0, &cart_comm);
 
-  MpiSolverParams params(cart_comm, mesh.dims().size(), mpi_dims.data());
+  MpiSolverParams params(cart_comm, mesh.dims().size() - 1, mpi_dims.data());
 
   // The size of the local domain.
   std::vector<int> local_sizes(mesh.dims().size());
@@ -156,7 +156,7 @@ void test_solver_from_file(const std::string &file_name) {
     domain_offsets[i] = params.mpi_coords[i - 1] * (global_dim / mpi_dims[i - 1]);
     local_sizes[i] = params.mpi_coords[i - 1] == mpi_dims[i - 1] - 1
                          ? global_dim - domain_offsets[i]
-                         : global_dim / mpi_dims[i];
+                         : global_dim / mpi_dims[i - 1];
     global_strides[i] = i == 0 ? 1 : global_strides[i - 1] * mesh.dims()[i - 1];
     domain_size *= local_sizes[i];
   }
