@@ -68,8 +68,6 @@ static struct option options[] = {
   {"ny",   required_argument, 0,  0   },
   {"nz",   required_argument, 0,  0   },
   {"iter", required_argument, 0,  0   },
-  {"opt",  required_argument, 0,  0   },
-  {"prof", required_argument, 0,  0   },
   {"help", no_argument,       0,  'h' },
   {0,      0,                 0,  0   }
 };
@@ -99,7 +97,7 @@ void setStartEnd(int *start, int *end, int coord, int numProcs, int numElements)
  * Print essential infromation on the use of the program
  */
 void print_help() {
-  printf("Please specify the ADI configuration, e.g.: \n$ ./adi_* -nx NX -ny NY -nz NZ -iter ITER [-opt CUDAOPT] -prof PROF\n");
+  printf("Please specify the ADI configuration, e.g.: \n$ ./adi_* -nx NX -ny NY -nz NZ -iter ITER\n");
   exit(0);
 }
 
@@ -154,8 +152,6 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
   int ny_g = 256;
   int nz_g = 256;
   iter = 10;
-  int opt  = 0;
-  int prof = 1;
 
   pre_handle.lambda = 1.0f;
 
@@ -167,8 +163,6 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     if(strcmp((char*)options[opt_index].name,"ny"  ) == 0) ny_g = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"nz"  ) == 0) nz_g = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"iter") == 0) iter = atoi(optarg);
-    if(strcmp((char*)options[opt_index].name,"opt" ) == 0) opt  = atoi(optarg);
-    if(strcmp((char*)options[opt_index].name,"prof") == 0) prof = atoi(optarg);
     if(strcmp((char*)options[opt_index].name,"help") == 0) print_help();
   }
 
@@ -324,13 +318,13 @@ int main(int argc, char* argv[]) {
   // Declare and reset elapsed time counters
   double timer           = 0.0;
   double timer1          = 0.0;
-  double timer2          = 0.0;
-  double elapsed         = 0.0;
   double elapsed_total   = 0.0;
   double elapsed_preproc = 0.0;
   double elapsed_trid_x  = 0.0;
   double elapsed_trid_y  = 0.0;
   double elapsed_trid_z  = 0.0;
+
+  const char *output_strings[2] = {"end h", "end d"}
 
   timing_start(&timer1);
 
@@ -390,8 +384,8 @@ int main(int argc, char* argv[]) {
   cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
   cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
-  rms("end h", h_u, app);
-  rms("end d", du, app);
+  rms(output_strings[0], h_u, app);
+  rms(output_strings[1], du, app);
 
   MPI_Barrier(MPI_COMM_WORLD);
 
