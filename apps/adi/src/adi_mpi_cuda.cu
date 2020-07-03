@@ -122,7 +122,7 @@ inline void timing_end(double *timer, double *elapsed_accumulate) {
 }
 
 // Function to add up a distributed array and print the result
-void rms(char* name, FP* array, app_handle &handle) {
+void rms(const char* name, FP* array, app_handle &handle) {
   //Sum the square of values in app.h_u
   double sum = 0.0;
   for(int k = 0; k < handle.size[2]; k++) {
@@ -320,8 +320,6 @@ int main(int argc, char* argv[]) {
   double elapsed_trid_y  = 0.0;
   double elapsed_trid_z  = 0.0;
 
-  const char *output_strings[2] = {"end h", "end d"};
-
   timing_start(&timer1);
 
   // Allocate memory used in sums of distributed arrays
@@ -380,8 +378,8 @@ int main(int argc, char* argv[]) {
   cudaSafeCall( cudaMemcpy(h_u, app.u, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
   cudaSafeCall( cudaMemcpy(du, app.d, sizeof(FP) * app.size[0] * app.size[1] * app.size[2], cudaMemcpyDeviceToHost) );
 
-  rms(output_strings[0], h_u, app);
-  rms(output_strings[1], du, app);
+  rms("end h", h_u, app);
+  rms("end d", du, app);
 
   MPI_Barrier(MPI_COMM_WORLD);
 
