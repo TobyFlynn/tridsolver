@@ -393,7 +393,7 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 
   // Print out timings of each section
-  if(app.coords[0] == 0 && app.coords[1] == 0 && app.coords[2] == 0) {
+  if(app.coords[0] == 0 && app.coords[1] == 0) {
     // Print execution times
     printf("Time per section: \n[total] \t[prepro] \t[trid_x] \t[trid_y] \t[trid_z]\n");
     printf("%e \t%e \t%e \t%e \t%e\n",
