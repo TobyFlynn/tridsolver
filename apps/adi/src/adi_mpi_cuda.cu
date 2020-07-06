@@ -137,7 +137,7 @@ void rms(const char* name, FP* array, app_handle &handle) {
   double global_sum = 0.0;
   MPI_Allreduce(&sum, &global_sum,1, MPI_DOUBLE,MPI_SUM, handle.comm);
 
-  if(handle.coords[0] == 0 && handle.coords[1] == 0 && handle.coords[2] == 0) {
+  if(handle.coords[0] == 0 && handle.coords[1] == 0) {
     printf("%s sum = %.15g\n", name, global_sum);
   }
 

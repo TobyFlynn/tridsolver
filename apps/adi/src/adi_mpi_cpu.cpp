@@ -138,7 +138,7 @@ void rms(char* name, FP* array, app_handle &handle) {
   double global_sum = 0.0;
   MPI_Allreduce(&sum, &global_sum,1, MPI_DOUBLE,MPI_SUM, handle.comm);
 
-  if(handle.coords[0] == 0 && handle.coords[1] == 0 && handle.coords[2] == 0) {
+  if(handle.coords[0] == 0 && handle.coords[1] == 0) {
     printf("%s sum = %.15g\n", name, global_sum);
   }
 
@@ -219,8 +219,8 @@ int init(app_handle &app, preproc_handle<FP> &pre_handle, int &iter, int argc, c
     printf("\nGlobal grid dimensions: %d x %d x %d\n",
            app.size_g[0], app.size_g[1], app.size_g[2]);
 
-    printf("\nNumber of MPI procs in each dimenstion %d, %d, %d\n",
-           app.pdims[0], app.pdims[1], app.pdims[2]);
+    printf("\nNumber of MPI procs in each dimenstion %d, %d\n",
+           app.pdims[0], app.pdims[1]);
   }
 
   /*printf("Check parameters: SIMD_WIDTH = %d, sizeof(FP) = %d\n", SIMD_WIDTH, sizeof(FP));
@@ -370,7 +370,7 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 
   // Print out timings of each section
-  if(app.coords[0] == 0 && app.coords[1] == 0 && app.coords[2] == 0) {
+  if(app.coords[0] == 0 && app.coords[1] == 0) {
     // Print execution times
     printf("Time per section: \n[total] \t[prepro] \t[trid_x] \t[trid_y] \t[trid_z]\n");
     printf("%e \t%e \t%e \t%e \t%e\n",
